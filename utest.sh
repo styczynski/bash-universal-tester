@@ -366,7 +366,7 @@ function test_err {
       if [[ "$flag_good_err_path" != "" ]]; then
         if [ "$good_err_path" ]; then
           diff=$(diff --text --minimal --suppress-blank-empty --strip-trailing-cr --ignore-case --ignore-tab-expansion --ignore-trailing-space --ignore-space-change --ignore-all-space --ignore-blank-lines $err_path $good_err_path)
-
+		  
           if [[ $diff != '' ]]; then
             was_error=true
             print_error_by_default=false
@@ -406,7 +406,7 @@ function test_err {
             fi
           else
             if [[ "$flag_default_require_err_emptyness" = "true" ]]; then
-              if [ -f "$err_path" ]; then
+			  if [ -s "$err_path" ]; then
                 was_error=true
               fi
             else
@@ -417,7 +417,7 @@ function test_err {
           fi
         fi
       else
-        if [ -f "$err_path" ]; then
+        if [ -s "$err_path" ]; then
           was_error=true
         fi
       fi
@@ -431,7 +431,8 @@ function flush_err_messages {
   if [[ "$print_error_by_default" = "true" ]]; then
     err_index=$((err_index+1))
     err_message=$(cat "$err_path")
-    if [[ $flag_extreamely_minimalistic = 'true' ]]; then
+    printf "${B_INFO}i Provided error message: [${err_message}]${B_INFO}\n"
+	if [[ $flag_extreamely_minimalistic = 'true' ]]; then
       printf  "${B_ERR}$input_file${E_ERR}\n"
     else
       if [[ $flag_very_minimal = 'true' ]]; then
