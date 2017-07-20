@@ -9,7 +9,7 @@ VERSION="1.2.0"
 # Usage: type test.sh --help to get some info
 #
 #
-# @Piotr Styczy�ski 2017
+# @Piotr Styczyński 2017
 #
 
 
@@ -144,6 +144,7 @@ function print_help {
 }
 
 
+
 function prepare_input {
   if [[ -f $param_dir ]]; then
     folder_loc=${param_dir%%.*}
@@ -158,6 +159,7 @@ function prepare_input {
     param_dir="$folder_loc"
   fi
 }
+
 
 function verify_args {
   printf "${B_BOLD}--- utest.sh VERSION ${VERSION}v ---${E_BOLD}\n\n"
