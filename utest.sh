@@ -41,6 +41,7 @@ flag_testing_programs=
 flag_additional_test_name_info=
 
 
+
 C_RED=$(printf "\e[1;31m")
 C_GREEN=$(printf "\e[1;32m")
 C_BLUE=$(printf "\e[1;34m")
@@ -99,6 +100,7 @@ function print_help {
   printf "      All available [test_flags] are:\n"
   printf "        --ttools <tools> - set additional debug tools\n"
   printf "           Tools is the coma-separated array of tools names. Tools names can be as the following:\n"
+  printf "               * size - prints the size of input file in bytes.\n"
   printf "               * time - prints time statistic using Unix time command.\n"
   printf "               * stime - measures time using bash date command (not as precise as time tool).\n"
   printf "               * vmemcheck - uses valgrind memcheck tools to search for application leaks.\n"
@@ -142,8 +144,24 @@ function print_help {
 }
 
 
+function prepare_input {
+  if [[ -f $param_dir ]]; then
+    folder_loc=${param_dir%%.*}
+    if [[ ! -d "$folder_loc" ]]; then
+      printf "${B_INFO}Test input is zip file -- needs unzipping...${E_INFO}\n"
+      printf "${B_INFO}This may take a while...${E_INFO}\n"
+      mkdir "$folder_loc"
+      unzip -q "$param_dir" -d "$folder_loc"
+    fi
+    flag_good_err_path="${flag_good_err_path//$param_dir/$folder_loc}"
+    flag_good_out_path="${flag_good_out_path//$param_dir/$folder_loc}"
+    param_dir="$folder_loc"
+  fi
+}
 
 function verify_args {
+  printf "${B_BOLD}--- utest.sh VERSION ${VERSION}v ---${E_BOLD}\n\n"
+
   if [[ ${flag_force} = 'false' ]]; then
 
     prog_use_autodetect=false
@@ -320,6 +338,7 @@ function count_input_files {
 
 
 function print_summary {
+  printf "\n"
   if [[ $flag_minimal = 'false' ]]; then
     if [[ "$not_exists_index" != "0" ]]; then
       printf "  ${B_WARN} $not_exists_index output files do not exits ${E_WARN}\n"
@@ -427,27 +446,106 @@ function test_err {
 
 
 
+
+
+
+
+
+
+
+
+
+message_accumulator=""
+message_last_file_head=""
+message_tooling_data_accumulator=""
+
+function push_test_message_with_head {
+  message_accumulator_head=""
+  message_accumulator_file_head=""
+  
+  if [[ "$message_accumulator" = "" ]]; then
+    message_accumulator_head="${B_DEBUG}[$file_index/$file_count]${E_DEBUG} $input_file"
+    if [ $flag_testing_programs_len -gt 1 ]; then
+      message_accumulator="${message_accumulator}\n${message_accumulator_head}\n"
+      message_accumulator_head=""
+    fi
+  fi
+  
+  message_accumulator_file_head="$flag_additional_test_name_info"
+  if [[ "$message_accumulator_file_head" = "$message_last_file_head" ]]; then
+    message_accumulator_file_head=""
+  else
+    message_last_file_head="$message_accumulator_file_head"
+  fi
+  
+  tooling_data="${message_tooling_data_accumulator}"
+  if [[ "$1" = "" ]]; then
+    message_accumulator_line=$(printf "%s%s%s\n" "${message_accumulator_head}${message_accumulator_file_head}" "$2" "")
+  else
+    message_accumulator_line=$(printf "%-30s%-30s%s\n" "${message_accumulator_head}${message_accumulator_file_head}" "$1" "${tooling_data}")
+  fi
+ 
+  #printf "{PUSH TO ACCUMULATOR ${message_accumulator_line}}"
+  message_accumulator="${message_accumulator}\n${message_accumulator_line}"
+}
+
+function push_test_message_error {
+  push_test_message_with_head "${B_ERR}$1${E_ERR}"
+}
+
+function push_test_message_error_details {
+  lineprefix=$(printf "%-20s" " ")
+  err_message=$(echo -en "$1" | sed "s/^/${lineprefix}${B_ERR}\|${E_ERR}  /g")
+  push_test_message_with_head "" "${B_ERR}${err_message}${E_ERR}"
+}
+
+function push_test_message_good {
+  push_test_message_with_head "${B_OK}[OK]${E_OK}" ""
+}
+
+function push_test_message_tooling_info {
+  message_tooling_data_accumulator="${message_tooling_data_accumulator} ${B_INFO}[$1]${E_INFO}"
+}
+
+function push_test_message_next_program {
+  message_tooling_data_accumulator=""
+}
+
+function flush_test_messages {
+  echo -en "${message_accumulator}"
+  message_accumulator=""
+  message_last_file_head=""
+  message_tooling_data_accumulator=""
+}
+
+
+
+
+
+
+
+
+
+
+
+
 function flush_err_messages {
   if [[ "$print_error_by_default" = "true" ]]; then
     err_index=$((err_index+1))
     err_message=$(cat "$err_path")
-    printf "${B_INFO}i Provided error message: [${err_message}]${B_INFO}\n"
 	if [[ $flag_extreamely_minimalistic = 'true' ]]; then
-      printf  "${B_ERR}$input_file${E_ERR}\n"
+	  push_test_message_error "$input_file"
     else
       if [[ $flag_very_minimal = 'true' ]]; then
-        printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_ERR}[ERR] Error at stderr${E_ERR}"
+      push_test_message_error "Error at stderr"
       else
-        printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_ERR}[ERR] Error at stderr${E_ERR}"
-        err_message=$(echo -en "$err_message" | sed "s/^/ $B_ERR\|$E_ERR  /g")
-        printf  "$err_message\n"
+        push_test_message_error "Error at stderr"
+        push_test_message_error_details "$err_message\n"
       fi
     fi
   fi
   clean_temp_content
 }
-
-
 
 function abort_if_too_many_errors {
   if [[ "$err_index" -gt 5 ]]; then
@@ -469,24 +567,23 @@ function check_out_script {
   if [[ $ok != 'true' ]]; then
     err_index=$((err_index+1))
     err_message=$diff
-    err_message=$(echo -en "$err_message" | sed "s/^/ $B_ERR\|$E_ERR  /g")
     if [[ $flag_extreamely_minimalistic = 'false' ]]; then
-      printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_ERR}[ERR] Invalid tester answer${E_ERR}"
+      push_test_message_error "Invalid tester answer"
     else
-      printf  "${B_ERR}$input_file${E_ERR}\n"
+      push_test_message_error "$input_file"
     fi
     if [[ $flag_very_minimal = 'false' ]]; then
       # We dont want this
       if [[ 'true' = 'false' ]]; then
-        printf  "\n  ${B_ERR}_${E_ERR}  \n$err_message\n ${B_ERR}|_${E_ERR}  \n"
+        push_test_message_error "  \n$err_message\n ${B_ERR}|_${E_ERR}  \n"
       else
-        printf  "$err_message\n"
+        push_test_message_error_details "$err_message\n"
       fi
     fi
   else
     ok_index=$((ok_index+1))
     if [[ $flag_skip_ok = 'false' ]]; then
-      printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_OK}[OK]${E_OK}"
+      push_test_message_good
     fi
     rm -f $err_path
   fi
@@ -504,18 +601,17 @@ function check_out_script_err {
     print_error_by_default=false
     err_index=$((err_index+1))
     err_message=$diff
-    err_message=$(echo -en "$err_message" | sed "s/^/ $B_ERR\|$E_ERR  /g")
     if [[ $flag_extreamely_minimalistic = 'false' ]]; then
-      printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $err_path $flag_additional_test_name_info" "${B_ERR}[ERR] Invalid tester answer for stderr${E_ERR}"
+      push_test_message_error "Invalid tester answer for stderr"
     else
-      printf  "${B_ERR}$err_path${E_ERR}\n"
+      push_test_message_erro "$err_path"
     fi
     if [[ $flag_very_minimal = 'false' ]]; then
       # We dont want this
       if [[ 'true' = 'false' ]]; then
-        printf  "\n  ${B_ERR}_${E_ERR}  \n$err_message\n ${B_ERR}|_${E_ERR}  \n"
+        push_test_message_error_details "  \n$err_message\n ${B_ERR}|_${E_ERR}  \n"
       else
-        printf  "$err_message\n"
+        push_test_message_error_details "$err_message\n"
       fi
     fi
   fi
@@ -525,27 +621,26 @@ function check_out_diff {
   if [[ $diff != '' ]]; then
     err_index=$((err_index+1))
     err_message=$diff
-    err_message=$(echo -en "$err_message" | sed "s/^/ $B_ERR\|$E_ERR  /g")
 
     if [[ $flag_extreamely_minimalistic = 'false' ]]; then
-      printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_ERR}[ERR] Non matching output${E_ERR}"
+      push_test_message_error "Non matching output"
     else
-      printf  "${B_ERR}$input_file${E_ERR}\n"
+      push_test_message_error "$input_file\n"
     fi
 
     if [[ $flag_very_minimal = 'false' ]]; then
       # We dont want this
       if [[ 'true' = 'false' ]]; then
-        printf  "\n  ${B_ERR}_${E_ERR}  \n$err_message\n ${B_ERR}|_${E_ERR}  \n"
+        push_test_message_error_details "  \n$err_message\n ${B_ERR}|_${E_ERR}  \n"
       else
-        printf  "$err_message\n"
+        push_test_message_error_details "$err_message\n"
       fi
     fi
 
   else
     ok_index=$((ok_index+1))
     if [[ $flag_skip_ok = 'false' ]]; then
-      printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_OK}[OK]${E_OK}"
+      push_test_message_good
     fi
     rm -f $err_path
 
@@ -664,21 +759,26 @@ function run_program {
 
   if [[ $flag_tools_use_stime = 'true' ]]; then
     tool_time_data_stime_end=`date +%s%3N`
-    tooling_additional_test_info="${tooling_additional_test_info}Execution time (script dependent): $((tool_time_data_stime_end-tool_time_data_stime_start)) ms\n"
+    push_test_message_tooling_info "$((tool_time_data_stime_end-tool_time_data_stime_start))ms"
+    #tooling_additional_test_info="${tooling_additional_test_info}Execution time (script dependent): $((tool_time_data_stime_end-tool_time_data_stime_start)) ms\n"
   fi
 
   if [[ $flag_tools_use_time = 'true' ]]; then
     #r=$($param_prog $input_prog_flag_acc < $input_file_path 1> $out_path 2> $err_path)
     timeOut=$({ time $param_prog $input_prog_flag_acc < $input_file_path 1> /dev/null 2> /dev/null ; } 2>&1 )
     timeOut="$(echo -e "${timeOut}" | sed '/./,$!d')"
-    tooling_additional_test_info="${tooling_additional_test_info}${timeOut}\n"
+    #tooling_additional_test_info="${tooling_additional_test_info}${timeOut}\n"
+    timeReal=$(echo "${timeOut}" | grep real | sed -e 's/real//')
+    timeReal="$(echo -e "${timeReal}" | tr -d '[:space:]')"
+    push_test_message_tooling_info "${timeReal}"
   fi
 
   if [[ $flag_tools_use_vmassif = 'true' ]]; then
     { valgrind --tool=massif --pages-as-heap=yes --massif-out-file=massif.out $param_prog $input_prog_flag_acc < $input_file_path 1> /dev/null 2> /dev/null ; } > /dev/null 2>&1
     memUsage=$(grep mem_heap_B massif.out | sed -e 's/mem_heap_B=\(.*\)/\1/' | sort -g | tail -n 1)
     memUsage=$(echo "scale=5; $memUsage/1000000" | bc)
-    tooling_additional_test_info="${tooling_additional_test_info}Peak memory usage: ${memUsage}MB\n"
+    #tooling_additional_test_info="${tooling_additional_test_info}Peak memory usage: ${memUsage}MB\n"
+    push_test_message_tooling_info "${memUsage}MB"
     rm ./massif.out
   fi
 
@@ -686,11 +786,18 @@ function run_program {
     { valgrind --tool=memcheck $param_prog $input_prog_flag_acc < $input_file_path > /dev/null ; } 2> ./memcheck.out
     leaksReport=$(sed 's/==.*== //' ./memcheck.out | sed -n -e '/LEAK SUMMARY:/,$p' | sed 's/LEAK SUMMARY://' | head -5)
     if [[ $leaksReport != '' ]]; then
-      tooling_additional_test_info="${tooling_additional_test_info}Leaks detected / Report:\n${leaksReport}\n"
+      #tooling_additional_test_info="${tooling_additional_test_info}Leaks detected / Report:\n${leaksReport}\n"
+      push_test_message_tooling_info "Leaks!"
     else
-      tooling_additional_test_info="${tooling_additional_test_info}No leaks possible.\n"
+      #tooling_additional_test_info="${tooling_additional_test_info}No leaks possible.\n"
+      push_test_message_tooling_info "No leaks"
     fi
     rm ./memcheck.out
+  fi
+  
+  if [[ $flag_tools_use_size = 'true' ]]; then
+    inputFileSize=$(stat -c%s "${input_file_path}")
+    push_test_message_tooling_info "<${inputFileSize} bytes"
   fi
 
 
@@ -786,6 +893,7 @@ done
 
 
 set_format
+prepare_input
 verify_args
 clean_out_err_paths
 collect_testing_programs
@@ -809,7 +917,7 @@ do
     prog=${flag_testing_programs[${prog_iter}]}
     #echo "|===> Prog ${prog}"
     if [ $flag_testing_programs_len -gt 1 ]; then
-      flag_additional_test_name_info="(${B_INFO} ${prog} ${E_INFO})"
+      flag_additional_test_name_info="${B_INFO} ${prog} ${E_INFO}"
     else
       flag_additional_test_name_info=""
     fi
@@ -835,11 +943,14 @@ do
         test_out
         print_tooling_additional_test_info
       fi
-      file_index=$((file_index+1))
     fi
     clean_temp_content
     prog_iter=$((prog_iter+1))
+    push_test_message_next_program
   done
+  
+  file_index=$((file_index+1))
+  flush_test_messages
 done
 
 
