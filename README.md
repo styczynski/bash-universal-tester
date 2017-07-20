@@ -4,7 +4,7 @@
 # bash-universal-tester
 Universal testing script for bash
 
-General purpose awesome `testing-script`
+General purpose awesome **testing-script**
 
 ## What?
 
@@ -18,17 +18,27 @@ Currently this script supports:
 
 * Some nice types of output formatting 
 
+## Requirements
+
+This is stand-alone script.
+
+* Works on Linux with bash shell
+
+* Works on Windows **(BUT YOU NEED BASH EMULATION LIKE [CYGWIN][link cygwin])**
+
+
+
 ## Basic usage
 
 Basic usage:
-	`test <prog>`
+	`utest <prog>`
 	
 The script tries to autodetect folder with input/output test files.
 And sometimes gives suggestions what program you may want to test.
 
 ## Advanced usage
 
-`test [test_flags] <prog> <dir> [prog_flags]`
+`utest [test_flags] <prog> <dir> [prog_flags]`
 
 * `<prog>` is path to the executable, you want to test
 
@@ -85,3 +95,4 @@ About minimalistic modes:
 
 [link styczynski]: http://styczynski.ml
 
+[link cygwin]: https://cygwin.com
