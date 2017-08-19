@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="1.2.0"
+VERSION="1.3.0"
 #
 # General purpose awesome testing-script
 # Used to test program with given .in/.err files
@@ -144,22 +144,87 @@ function print_help {
 }
 
 
+function update_loc {
+  filename="$1"
+  folder_loc="$filename"
+  es_param_dir=$(echo "${param_dir}" | sed 's:/:\\\/:g')
+  es_folder_loc=$(echo "${folder_loc}" | sed 's:/:\\\/:g')
+  
+  #printf "es_param_dir = ${es_param_dir}\n"
+  #printf "es_folder_loc = ${es_folder_loc}\n"
+  #printf "       flag_good_err_path = ${flag_good_err_path}\n"
+  #printf "       flag_good_out_path = ${flag_good_out_path}\n"
+  
+  #flag_good_err_path=$(echo "${flag_good_err_path}" | sed -e 's/${es_param_dir}/'$es_folder_loc'/g')
+  #flag_good_out_path=$(echo "${flag_good_out_path}" | sed -e 's/${es_param_dir}/'$es_folder_loc'/g')
+  flag_good_err_path="${flag_good_err_path//$es_param_dir/$es_folder_loc}"
+  flag_good_out_path="${flag_good_out_path//$es_param_dir/$es_folder_loc}"
+  
+  #printf "after: flag_good_err_path = ${flag_good_err_path}\n"
+  #printf "after: flag_good_out_path = ${flag_good_out_path}\n"
+  #printf "  NOW OK\n\n"
+  
+  param_dir="$filename"
+}
+
 
 function prepare_input {
+
+  
+  regex='(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]'
+  if [[ $param_dir =~ $regex ]]
+  then 
+    # Link is valid URL so try to download file
+    printf "${B_INFO}Trying to download data from provided url...${E_INFO}\n"
+    filename=$(curl -sI  $param_dir | grep -o -E 'filename=.*$' | sed -e 's/filename=//')
+    if [[ "$filename" = "" ]]; then
+      filename="downloaded_tests.zip"
+    fi
+    if [[ -f $filename ]]; then
+      printf "${B_INFO}File already present. Skipping.${E_INFO}\n"
+      update_loc "$filename"
+    else
+      printf "${B_INFO}Download into \"${filename}\"${E_INFO}\n"
+      curl -f -L -o "$filename" $param_dir
+      curl_status=$?
+      if [ "$curl_status" -eq 0 ]; then
+        update_loc "$filename"
+      else
+        printf "${B_ERR}Could not download requested file. :(${E_ERR}\n"
+        exit 22
+      fi
+    fi
+  fi
+
   if [[ -f $param_dir ]]; then
     folder_loc=${param_dir%%.*}
+	
     if [[ ! -d "$folder_loc" ]]; then
       printf "${B_INFO}Test input is zip file -- needs unzipping...${E_INFO}\n"
       printf "${B_INFO}This may take a while...${E_INFO}\n"
       mkdir "$folder_loc"
       unzip -q "$param_dir" -d "$folder_loc"
     fi
-    flag_good_err_path="${flag_good_err_path//$param_dir/$folder_loc}"
-    flag_good_out_path="${flag_good_out_path//$param_dir/$folder_loc}"
-    param_dir="$folder_loc"
+    
+    update_loc "$folder_loc"
+    
+    # USE AUTOFIND
+    best_test_dir=$(autofind_tests "$folder_loc")
+    if [[ ${best_test_dir} != '' ]]; then
+      printf "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
+      update_loc "$best_test_dir"  
+    else
+      update_loc "$folder_loc"
+    fi
+    
   fi
 }
 
+function autofind_tests {
+  # USE AUTOFIND
+  best_test_dir=$(find "$1" -maxdepth 3 -type f -name "**.in" -printf '%h\n' | sort | uniq -c | sort -k 1 -r | awk  '{print $2}' | head -n 1)
+  printf "$best_test_dir"
+}
 
 function verify_args {
   printf "${B_BOLD}--- utest.sh VERSION ${VERSION}v ---${E_BOLD}\n\n"
@@ -199,8 +264,7 @@ function verify_args {
     fi
     if [[ $param_dir = '' ]]; then
       # USE AUTOFIND
-      #find . -type f -name "*.txt" -printf '%h\n' | sort | uniq
-      best_test_dir=$(find . -type f -name "*.in" -printf '%h\n' | sort | uniq -c | sort -k 1 -r | awk  '{print $2}' | head -n 1)
+      best_test_dir=$(autofind_tests ".")
       if [[ ${best_test_dir} = '' ]]; then
         printf "${B_ERR}Input directory was not given. (parameter <input_dir> is missing)${E_ERR}\n"
         printf "${B_ERR}Usage: test <prog> <input_dir> [flags]${E_ERR}\n"
@@ -466,7 +530,7 @@ function push_test_message_with_head {
   message_accumulator_file_head=""
   
   if [[ "$message_accumulator" = "" ]]; then
-    message_accumulator_head="${B_DEBUG}[$file_index/$file_count]${E_DEBUG} $input_file"
+    message_accumulator_head="${B_DEBUG}[$file_index/$file_count]${E_DEBUG} $input_file    "
     if [ $flag_testing_programs_len -gt 1 ]; then
       message_accumulator="${message_accumulator}\n${message_accumulator_head}\n"
       message_accumulator_head=""
