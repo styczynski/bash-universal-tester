@@ -1,7 +1,7 @@
 [![Made by Styczynsky Digital Systems][badge sts]][link styczynski]
 
 
-# bash-universal-tester &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [![Download][badge download]][link download latest]
+# :white_check_mark: bash-universal-tester &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [![Download][badge download]][link download latest]
 Universal testing script for bash
 
 General purpose awesome **testing-script**
