@@ -1,6 +1,147 @@
 #!/bin/bash
 
-VERSION="1.3.0"
+VERSION="1.4.0"
+
+# Dependencies
+
+#
+#
+# Code based on spinner.sh by Tasos Latsas
+#
+#
+
+# Author: Tasos Latsas
+
+# spinner.sh
+#
+# Display an awesome 'spinner' while running your long shell commands
+#
+# Do *NOT* call _spinner function directly.
+# Use {start,stop}_spinner wrapper functions
+
+# usage:
+#   1. source this script in your's
+#   2. start the spinner:
+#       start_spinner [display-message-here]
+#   3. run your command
+#   4. stop the spinner:
+#       stop_spinner [your command's exit status]
+#
+# Also see: test.sh
+
+
+function _spinner() {
+    # $1 start/stop
+    #
+    # on start: $2 display message
+    # on stop : $2 process exit status
+    #           $3 spinner function pid (supplied from stop_spinner)
+
+    local on_success=""
+    local on_fail=""
+    local white="\e[1;37m"
+    local green="\e[1;32m"
+    local red="\e[1;31m"
+    local nc="\e[0m"
+
+    case $1 in
+        start)
+			if [[ -z ${3} ]]; then
+				#echo "spinner is not running.."
+				# calculate the column where spinner and status msg will be displayed
+				# let column=$(tput cols)-${#2}-8
+				let column=1
+				# display message and position the cursor in $column column
+				#echo -ne ${2}
+				#printf "%${column}s"
+
+				
+				# start spinner
+				i=1
+				sp='\|/-'
+				delay=${SPINNER_DELAY:-0.15}
+
+				echo -ne "  "
+				while :
+				do
+					printf "\b${sp:i++%${#sp}:1}"
+					sleep $delay
+				done
+			else
+				#echo -e ""
+				sleep 0
+			fi
+            ;;
+        stop)
+            if [[ -z ${3} ]]; then
+                #echo "spinner is not running.."
+                #exit 1
+				#echo -e ""
+				sleep 0
+			else
+				kill -9 $3 > /dev/null 2>&1
+				while kill -0 $3 2>/dev/null; do sleep 0.005; done
+				# inform the user upon success or failure
+				echo -ne "\b"
+				#if [[ $2 -eq 0 ]]; then
+				#	echo -en "${green}${on_success}${nc}"
+				#else
+				#	echo -en "${red}${on_fail}${nc}"
+				#fi
+				#echo -e ""
+            fi
+            ;;
+        *)
+            echo "invalid argument, try {start/stop}"
+            exit 1
+            ;;
+    esac
+}
+
+spinner_is_running=false
+flag_use_spinner=false
+
+function start_spinner {
+	if [[ "$flag_use_spinner" = "true" ]]; then
+		if [[ "$spinner_is_running" = "false" ]]; then
+			spinner_is_running=true
+			# $1 : msg to display
+			_spinner "start" "${1}" &
+			# set global spinner pid
+			_sp_pid=$!
+			disown
+		fi
+	fi
+}
+
+function stop_spinner {
+	if [[ "$spinner_is_running" = "true" ]]; then
+		spinner_is_running=false
+		# $1 : command exit status
+		_spinner "stop" $1 $_sp_pid
+		unset _sp_pid
+	fi
+}
+
+function sbusy {
+	start_spinner "$1"
+}
+
+function sready {
+	stop_spinner 0
+}
+
+sbusy ""
+
+#
+#
+# UTEST.SH
+#
+#
+
+
+echo -e "--- utest.sh VERSION ${VERSION}v ---\n\n"
+
 #
 # General purpose awesome testing-script
 # Used to test program with given .in/.err files
@@ -65,6 +206,7 @@ E_BOLD=
 B_OK=
 E_OK=
 
+TEXT_OK="OK"
 
 
 function clean_temp_content {
@@ -87,9 +229,15 @@ function clean_temp {
   fi
 }
 
+function close {
+	sready $1
+	exit $1
+}
+
 
 
 function print_help {
+  sready
   printf "General purpose awesome testing-script v. $VERSION\n\n"
   printf "Usage:\n"
   printf "    test  [test_flags] <prog> <dir> [prog_flags]\n"
@@ -116,6 +264,7 @@ function print_help {
   printf "        --tflags - enable --t* flags interpreting at any place among command line arguments (by default flags after dir are expected to be program flags)\n"
   printf "        --tsty-format - use !error!, !info! etc. output format\n"
   printf "        --tterm-format - use (default) term color formatting\n"
+  printf "        --tno-spinner - display no spinner\n"
   printf "        --tc, --tnone-format - use clean character output\n"
   printf "        --ts - Skip oks\n"
   printf "        --tierr - Always ignore stderr output.\n"
@@ -175,23 +324,27 @@ function prepare_input {
   if [[ $param_dir =~ $regex ]]
   then 
     # Link is valid URL so try to download file
+	sready
     printf "${B_INFO}Trying to download data from provided url...${E_INFO}\n"
     filename=$(curl -sI  $param_dir | grep -o -E 'filename=.*$' | sed -e 's/filename=//')
     if [[ "$filename" = "" ]]; then
       filename="downloaded_tests.zip"
     fi
     if [[ -f $filename ]]; then
+	  sready
       printf "${B_INFO}File already present. Skipping.${E_INFO}\n"
       update_loc "$filename"
     else
-      printf "${B_INFO}Download into \"${filename}\"${E_INFO}\n"
+      sready
+	  printf "${B_INFO}Download into \"${filename}\"${E_INFO}\n"
       curl -f -L -o "$filename" $param_dir
       curl_status=$?
       if [ "$curl_status" -eq 0 ]; then
         update_loc "$filename"
       else
-        printf "${B_ERR}Could not download requested file. :(${E_ERR}\n"
-        exit 22
+        sready
+		printf "${B_ERR}Could not download requested file. :(${E_ERR}\n"
+        close 22
       fi
     fi
   fi
@@ -200,7 +353,8 @@ function prepare_input {
     folder_loc=${param_dir%%.*}
 	
     if [[ ! -d "$folder_loc" ]]; then
-      printf "${B_INFO}Test input is zip file -- needs unzipping...${E_INFO}\n"
+      sready
+	  printf "${B_INFO}Test input is zip file -- needs unzipping...${E_INFO}\n"
       printf "${B_INFO}This may take a while...${E_INFO}\n"
       mkdir "$folder_loc"
       unzip -q "$param_dir" -d "$folder_loc"
@@ -211,7 +365,8 @@ function prepare_input {
     # USE AUTOFIND
     best_test_dir=$(autofind_tests "$folder_loc")
     if [[ ${best_test_dir} != '' ]]; then
-      printf "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
+      sready
+	  printf "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
       update_loc "$best_test_dir"  
     else
       update_loc "$folder_loc"
@@ -223,12 +378,12 @@ function prepare_input {
 function autofind_tests {
   # USE AUTOFIND
   best_test_dir=$(find "$1" -maxdepth 3 -type f -name "**.in" -printf '%h\n' | sort | uniq -c | sort -k 1 -r | awk  '{print $2}' | head -n 1)
+  sready
   printf "$best_test_dir"
 }
 
 function verify_args {
-  printf "${B_BOLD}--- utest.sh VERSION ${VERSION}v ---${E_BOLD}\n\n"
-
+ 
   if [[ ${flag_force} = 'false' ]]; then
 
     prog_use_autodetect=false
@@ -251,47 +406,53 @@ function verify_args {
       #done <<< "$possible_executables" | sort -n | cut -d ' ' -f2)
 
       if [[ $param_prog = '' ]]; then
-        printf "${B_ERR}Tested program name was not given. (parameter <prog> is missing)${E_ERR}\n"
+        sready
+		printf "${B_ERR}Tested program name was not given. (parameter <prog> is missing)${E_ERR}\n"
         printf "${B_DEBUG}Possible executables to test:\n\n$possible_executables"
         printf "\n\n${B_ERR}Usage: test <prog> <input_dir> [flags]${E_ERR}\n"
         printf "${B_DEBUG}Use -f option to forcefully proceed.${E_DEBUG}\n"
         clean_temp
-        exit 1
+        close 1
       else
         param_prog=$(echo "$possible_executables" | head -n 1)
-        printf "${B_DEBUG}Autodected \'$param_prog\' as best test program. Using it.${E_DEBUG}\n"
+        sready
+		printf "${B_DEBUG}Autodected \'$param_prog\' as best test program. Using it.${E_DEBUG}\n"
       fi
     fi
     if [[ $param_dir = '' ]]; then
       # USE AUTOFIND
       best_test_dir=$(autofind_tests ".")
       if [[ ${best_test_dir} = '' ]]; then
-        printf "${B_ERR}Input directory was not given. (parameter <input_dir> is missing)${E_ERR}\n"
+        sready
+		printf "${B_ERR}Input directory was not given. (parameter <input_dir> is missing)${E_ERR}\n"
         printf "${B_ERR}Usage: test <prog> <input_dir> [flags]${E_ERR}\n"
         printf "${B_DEBUG}Use -f option to forcefully proceed.${E_DEBUG}\n"
         clean_temp
-        exit 1
+        close 1
       else
+		sready
         #printf "${B_WARN}Input directory was not given. (parameter <input_dir> is missing)${E_WARN}\n"
-        printf "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
+		printf "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
         param_dir="$best_test_dir"
         if [[ "$flag_good_out_path" = "" ]]; then
           flag_good_out_path="$param_dir"
         fi
       fi
+	  #sready
       #printf "${B_ERR}Input directory was not given. (parameter <input_dir> is missing)${E_ERR}\n"
       #printf "${B_ERR}Usage: test <prog> <input_dir> [flags]${E_ERR}\n"
       #printf "${B_DEBUG}Use -f option to forcefully proceed.${E_DEBUG}\n"
       #clean_temp
-      #exit 1
+      #close 1
     fi
     if [[ -d $param_dir ]]; then
       echo -en ""
     else
+	  sready
       printf "${B_ERR}Input directory \"$param_dir\" does not exists.${E_ERR}\n"
       printf "${B_DEBUG}Use -f option to forcefully proceed.${E_DEBUG}\n"
       clean_temp
-      exit 1
+      close 1
     fi
   fi
   if [[ ${flag_always_need_good_err} = 'true' ]]; then
@@ -371,10 +532,11 @@ function find_testing_program {
         if [ "$?" != "0" ]; then
           command -v "./$param_prog.sh" >/dev/null 2>&1
           if [ "$?" != "0" ]; then
-            #printf "${B_ERR}Invalid program name: ${param_prog}. Program not found.${E_ERR}\n";
+            #sready
+			#printf "${B_ERR}Invalid program name: ${param_prog}. Program not found.${E_ERR}\n";
             #printf "${B_ERR}Please verify if the executable name is correct.${E_ERR}"
             #clean_temp
-            #exit 1
+            #close 1
             nothingthere=""
           else
             param_prog=./$param_prog.sh
@@ -404,6 +566,7 @@ function count_input_files {
 
 
 function print_summary {
+  sready
   printf "\n"
   if [[ $flag_minimal = 'false' ]]; then
     if [[ "$not_exists_index" != "0" ]]; then
@@ -417,13 +580,13 @@ function print_summary {
       if [[ "$ok_index" = "$file_count" ]]; then
         printf "\n${B_OK}Done testing. All $file_count tests passes. ${E_OK}\n"
       else
-        printf "\n${B_BOLD}Done testing.${E_BOLD}\n |  ${B_BOLD}TOTAL: $file_count${E_BOLD}\n |  DONE : $((file_index-1))\n |  ${B_WARN}WARN : $warn_index${E_WARN}\n |  ${B_ERR}ERR  : $err_index${E_ERR}\n |  ${B_OK}OK   : $ok_index ${E_OK}\n"
+        printf "\n${B_BOLD}Done testing.${E_BOLD}\n |  ${B_BOLD}TOTAL: $file_count${E_BOLD}\n |  DONE : $((file_index-1))\n |  ${B_WARN}WARN : $warn_index${E_WARN}\n |  ${B_ERR}ERR  : $err_index${E_ERR}\n |  ${B_OK}${TEXT_OK}   : $ok_index ${E_OK}\n"
       fi
     fi
   else
     if [[ $flag_extreamely_minimalistic = 'false' ]]; then
       if [[ "$ok_index" = "$file_count" ]]; then
-        printf "${B_OK}OK${E_OK}\n"
+        printf "${B_OK}${TEXT_OK}${E_OK}\n"
       fi
     fi
   fi
@@ -433,10 +596,12 @@ function print_summary {
 
 function print_start {
   if [[ $flag_minimal = 'false' ]]; then
-    printf "\n"
+    sready
+	printf "\n"
   fi
   if [[ $flag_minimal = 'false' ]]; then
-    printf "${B_BOLD}Performing tests...${E_BOLD}\n"
+    sready
+	printf "${B_BOLD}Performing tests...${E_BOLD}\n"
     printf "${B_DEBUG}Call $param_prog $input_prog_flag_acc ${E_DEBUG}\n\n"
   fi
 }
@@ -459,15 +624,19 @@ function test_err {
             err_message=$diff
             err_message=$(echo -en "$err_message" | sed "s/^/ $B_ERR\|$E_ERR  /g")
             if [[ $flag_extreamely_minimalistic = 'false' ]]; then
-              printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $err_path $flag_additional_test_name_info" "${B_ERR}[ERR] Non matching err-output${E_ERR}"
+              sready
+			  printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $err_path $flag_additional_test_name_info" "${B_ERR}[ERR] Non matching err-output${E_ERR}"
             else
+			  sready
               printf  "${B_ERR}$err_path $flag_additional_test_name_info${E_ERR}\n"
             fi
             if [[ $flag_very_minimal = 'false' ]]; then
               # We dont want this
               if [[ 'true' = 'false' ]]; then
-                printf  "\n  ${B_ERR}_${E_ERR}  \n$err_message\n ${B_ERR}|_${E_ERR}  \n"
+                sready
+				printf  "\n  ${B_ERR}_${E_ERR}  \n$err_message\n ${B_ERR}|_${E_ERR}  \n"
               else
+				sready
                 printf  "$err_message\n"
               fi
             fi
@@ -483,9 +652,12 @@ function test_err {
               not_exists_index=$((not_exists_index+1))
               if [[ "$not_exists_index" -lt "10" ]]; then
                 if [[ ${flag_extreamely_minimalistic} = 'true' ]]; then
-                  printf  "${B_WARN}$good_err_path $flag_additional_test_name_info${E_WARN}\n"
+                  sready
+				  printf  "${B_WARN}$good_err_path $flag_additional_test_name_info${E_WARN}\n"
                 else
-                  printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_WARN}[?] $good_err_path not exists${E_WARN}"
+				  sready
+				  want_to_skip_other_programs=true
+                  printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file" "${B_WARN}[?] $good_err_path not exists${E_WARN}"
                 fi
               fi
             fi
@@ -566,7 +738,7 @@ function push_test_message_error_details {
 }
 
 function push_test_message_good {
-  push_test_message_with_head "${B_OK}[OK]${E_OK}" ""
+  push_test_message_with_head "${B_OK}[${TEXT_OK}]${E_OK}" ""
 }
 
 function push_test_message_tooling_info {
@@ -616,9 +788,10 @@ function flush_err_messages {
 function abort_if_too_many_errors {
   if [[ "$err_index" -gt 5 ]]; then
     if [[ $flag_always_continue = 'false' ]]; then
-      printf "\n${B_WARN}[!] Abort testing +5 errors.${E_WARN}\nDo not use --ta flag to always continue."
+      sready
+	  printf "\n${B_WARN}[!] Abort testing +5 errors.${E_WARN}\nDo not use --ta flag to always continue."
       clean_temp
-      exit 1
+      close 1
     fi
   fi
 }
@@ -727,11 +900,12 @@ function check_testing_script {
     test_not_exists=false
   fi
   if [[ $test_not_exists = 'true' ]]; then
-      printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_ERR}[ERR] Testing script does not exists or is invalid command (--tscript). Abort.${E_ERR}"
+      sready
+	  printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_ERR}[ERR] Testing script does not exists or is invalid command (--tscript). Abort.${E_ERR}"
       printf  "%-30s  %s\n" " " "${B_ERR}Used command: $flag_test_out_script${E_ERR}"
 
       clean_temp
-      exit 1
+      close 1
   else
     if [[ $override_test_result != '' ]]; then
       diff=$override_test_result
@@ -760,11 +934,12 @@ function check_testing_script_err {
     test_not_exists=false
   fi
   if [[ $test_not_exists = 'true' ]]; then
-      printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $err_path $flag_additional_test_name_info" "${B_ERR}[ERR] Testing script does not exists or is invalid command (--tscript-err). Abort.${E_ERR}"
+      sready
+	  printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $err_path $flag_additional_test_name_info" "${B_ERR}[ERR] Testing script does not exists or is invalid command (--tscript-err). Abort.${E_ERR}"
       printf  "%-30s  %s\n" " " "${B_ERR}Used command: $flag_test_err_script${E_ERR}"
 
       clean_temp
-      exit 1
+      close 1
   else
     if [[ $override_test_result != '' ]]; then
       diff=$override_test_result
@@ -795,9 +970,12 @@ function test_out {
         not_exists_index=$((not_exists_index+1))
         if [[ "$not_exists_index" -lt "10" ]]; then
           if [[ ${flag_extreamely_minimalistic} = 'true' ]]; then
-            printf  "${B_WARN}$input_file${E_WARN}\n"
+            sready
+			printf  "${B_WARN}$input_file${E_WARN}\n"
           else
-            printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_WARN}[?] $good_out_path not exists${E_WARN}"
+		    sready
+			want_to_skip_other_programs=true
+            printf  "\n%-28s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG} $input_file" "${B_WARN}[?] $good_out_path not exists${E_WARN}"
           fi
         fi
       fi
@@ -808,7 +986,8 @@ function test_out {
 function print_tooling_additional_test_info {
   if [[ $tooling_additional_test_info != '' ]]; then
     tooling_message=$(echo -en "$tooling_additional_test_info" | sed "s/^/   /g")
-    printf "${B_DEBUG}${tooling_message}${E_DEBUG}\n"
+    sready
+	printf "${B_DEBUG}${tooling_message}${E_DEBUG}\n"
   fi
 }
 
@@ -908,6 +1087,7 @@ do
       --tsty-format) flag_formating=sty ;;
       --tterm-format) flag_formating=term ;;
       --tnone-format) flag_formating=none ;;
+	  --tno-spinner) flag_use_spinner=false ;;
       --tc) flag_formating=none ;;
       --tless-info) flag_skip_ok=true ;;
       --tout) shift; flag_out_path="$1"; flag_out_temp=false ;;
@@ -920,9 +1100,9 @@ do
       --tm) flag_skip_ok=true; flag_minimal=true ;;
       --tmm) flag_skip_ok=true; flag_minimal=true; flag_very_minimal=true ;;
       --tmmm) flag_skip_ok=true; flag_minimal=true; flag_very_minimal=true; flag_extreamely_minimalistic=true ;;
-      -help) print_help; exit 0;;
-      --help) print_help; exit 0;;
-      #--t*) printf "ERROR: Unknown test flag: $1 (all flags prefixed with --t* are recognized as test flags)\n"; exit 1 ;;
+      -help) print_help; close 0;;
+      --help) print_help; close 0;;
+      #--t*) printf "ERROR: Unknown test flag: $1 (all flags prefixed with --t* are recognized as test flags)\n"; close 1 ;;
       *) {
         if [[ $1 == -* ]]; then
           input_prog_flag_acc="$input_prog_flag_acc $1"
@@ -949,15 +1129,15 @@ do
       esac
     else
       case "$1" in
-        -help) print_help; exit 0;;
-        --help) print_help; exit 0;;
+        -help) print_help; close 0;;
+        --help) print_help; close 0;;
         *) input_prog_flag_acc="$input_prog_flag_acc $1" ;;
       esac
     fi
     shift
 done
 
-
+sbusy
 set_format
 prepare_input
 verify_args
@@ -967,7 +1147,7 @@ collect_testing_programs
 count_input_files
 print_start
 
-
+sbusy
 file_index=1
 err_index=0
 ok_index=0
@@ -975,11 +1155,19 @@ warn_index=0
 not_exists_index=0
 not_exists_but_created_index=0
 tooling_additional_test_info=
-for input_file_path in `ls -v $param_dir/*.in`
+
+#
+# input file list sorted by ascending file size
+#
+#input_file_list=`ls -vhS $param_dir/*.in | tr ' ' '\n'|tac|tr '\n' ' '`
+input_file_list=`ls -v $param_dir/*.in`
+
+for input_file_path in $input_file_list
 do
   prog_iter=0
   while [ $prog_iter -lt $flag_testing_programs_len ];
   do
+	sbusy
     prog=${flag_testing_programs[${prog_iter}]}
     #echo "|===> Prog ${prog}"
     if [ $flag_testing_programs_len -gt 1 ]; then
@@ -999,6 +1187,7 @@ do
       run_program
 
       was_error=false
+	  want_to_skip_other_programs=false
       print_error_by_default=true
       test_err
       if [[ "$was_error" = "true" ]]; then
@@ -1009,16 +1198,21 @@ do
         test_out
         print_tooling_additional_test_info
       fi
+	  if [[ "$want_to_skip_other_programs" = "true" ]]; then
+		break
+	  fi
     fi
     clean_temp_content
     prog_iter=$((prog_iter+1))
     push_test_message_next_program
+	sready
   done
   
+  sbusy
   file_index=$((file_index+1))
   flush_test_messages
 done
 
-
+sbusy
 print_summary
 clean_temp
