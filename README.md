@@ -28,7 +28,11 @@ This is stand-alone script.
 
 * Works on Windows **(BUT YOU NEED BASH EMULATION LIKE [CYGWIN][link cygwin])**
 
+## Installation
 
+* Download through provided link [![Download][badge download]][link download latest]
+
+* Alternatively on bash type: `wget https://raw.githubusercontent.com/styczynski/bash-universal-tester/master/utest.sh && chmod u+x ./utest.sh && mv ./utest.sh utest && PATH=$PATH:$PWD`
 
 ## Basic usage
 
