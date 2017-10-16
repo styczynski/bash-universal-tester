@@ -44,6 +44,13 @@ Basic usage:
 The script tries to autodetect folder with input/output test files.
 And sometimes gives suggestions what program you may want to test.
 
+To test input folder (only .in and .out):
+	`utest <prog> <folder>`
+
+To test input folder (.in, .out, and .err files):
+	`utest --tnerr <prog> <folder>`
+
+
 ## Advanced usage
 
 `utest [test_flags] <prog> <dir> [prog_flags]`
