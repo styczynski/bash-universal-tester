@@ -44,18 +44,29 @@ Basic usage:
 The script tries to autodetect folder with input/output test files.
 And sometimes gives suggestions what program you may want to test.
 
-### Basic in + out
+### Basic in + out + non empty err
 
 To test input folder (only .in and .out): 
 
 	`utest <prog> <folder>`
+	
+### Basic in + out + ignore err (err is not checked anytime)
 
-### Basic in + out + err (obligatory)
+To test input folder (only .in and .out): 
+
+	`utest --tierr <prog> <folder>`
+
+### Basic in + out + err (missing .err file cause error)
 
 To test input folder (.in, .out, and .err files): 
 
 	`utest --tnerr <prog> <folder>`
 
+### Basic in + out + err (missing .err files are ignored)
+
+To test input folder (.in, .out, and .err files): 
+
+	`utest --tgerr <folder> <prog> <folder>`
 
 ## Advanced usage
 
