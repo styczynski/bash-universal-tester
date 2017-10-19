@@ -1,8 +1,60 @@
 #!/bin/bash
 
-VERSION="1.4.0"
+VERSION="1.5.0"
 
 # Dependencies
+
+#
+#
+# YAML parsing in bash
+# Based on https://gist.github.com/pkuczynski/8665367
+# And on https://gist.github.com/epiloque/8cf512c6d64641bde388
+#
+#
+
+#
+# Usage: parse_yaml <file> [optional prefix] [optional string "true" -> then it sets all values to ""]
+#
+parse_yaml() {
+    local prefix=$2
+    local s
+    local w
+    local fs
+    s='[[:space:]]*'
+    w='[a-zA-Z0-9_]*'
+    fs="$(echo @|tr @ '\034')"
+    sed -ne "s|^\($s\)\($w\)$s:$s\"\(.*\)\"$s\$|\1$fs\2$fs\3|p" \
+        -e "s|^\($s\)\($w\)$s[:-]$s\(.*\)$s\$|\1$fs\2$fs\3|p" "$1" |
+    if [[ "$3" = "true" ]]; then
+      awk -F"$fs" '{
+      indent = length($1)/2;
+      vname[indent] = $2;
+      for (i in vname) {if (i > indent) {delete vname[i]}}
+          if (length($3) > 0) {
+              vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+              printf("%s%s%s=\"%s\"\n", "'"$prefix"'",vn, $2, "");
+          }
+      }' | sed 's/_=/+=/g'
+    else
+      awk -F"$fs" '{
+      indent = length($1)/2;
+      vname[indent] = $2;
+      for (i in vname) {if (i > indent) {delete vname[i]}}
+          if (length($3) > 0) {
+              vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+              printf("%s%s%s=(\"%s\")\n", "'"$prefix"'",vn, $2, $3);
+          }
+      }' | sed 's/_=/+=/g'
+    fi
+}
+
+# Helper function to generate short universal name
+# for tested program
+
+function shortname {
+  short_name=$(basename "$1" | awk -F. '{print $1"_"$2}')
+  printf "$short_name"
+} 
 
 #
 #
@@ -46,49 +98,49 @@ function _spinner() {
 
     case $1 in
         start)
-			if [[ -z ${3} ]]; then
-				#echo "spinner is not running.."
-				# calculate the column where spinner and status msg will be displayed
-				# let column=$(tput cols)-${#2}-8
-				let column=1
-				# display message and position the cursor in $column column
-				#echo -ne ${2}
-				#printf "%${column}s"
+      if [[ -z ${3} ]]; then
+        #echo "spinner is not running.."
+        # calculate the column where spinner and status msg will be displayed
+        # let column=$(tput cols)-${#2}-8
+        let column=1
+        # display message and position the cursor in $column column
+        #echo -ne ${2}
+        #printf "%${column}s"
 
-				
-				# start spinner
-				i=1
-				sp='\|/-'
-				delay=${SPINNER_DELAY:-0.15}
+        
+        # start spinner
+        i=1
+        sp='\|/-'
+        delay=${SPINNER_DELAY:-0.15}
 
-				echo -ne "  "
-				while :
-				do
-					printf "\b${sp:i++%${#sp}:1}"
-					sleep $delay
-				done
-			else
-				#echo -e ""
-				sleep 0
-			fi
+        echo -ne "  "
+        while :
+        do
+          printf "\b${sp:i++%${#sp}:1}"
+          sleep $delay
+        done
+      else
+        #echo -e ""
+        sleep 0
+      fi
             ;;
         stop)
             if [[ -z ${3} ]]; then
                 #echo "spinner is not running.."
                 #exit 1
-				#echo -e ""
-				sleep 0
-			else
-				kill -9 $3 > /dev/null 2>&1
-				while kill -0 $3 2>/dev/null; do sleep 0.005; done
-				# inform the user upon success or failure
-				echo -ne "\b"
-				#if [[ $2 -eq 0 ]]; then
-				#	echo -en "${green}${on_success}${nc}"
-				#else
-				#	echo -en "${red}${on_fail}${nc}"
-				#fi
-				#echo -e ""
+        #echo -e ""
+        sleep 0
+      else
+        kill -9 $3 > /dev/null 2>&1
+        while kill -0 $3 2>/dev/null; do sleep 0.005; done
+        # inform the user upon success or failure
+        echo -ne "\b"
+        #if [[ $2 -eq 0 ]]; then
+        #  echo -en "${green}${on_success}${nc}"
+        #else
+        #  echo -en "${red}${on_fail}${nc}"
+        #fi
+        #echo -e ""
             fi
             ;;
         *)
@@ -102,33 +154,33 @@ spinner_is_running=false
 flag_use_spinner=false
 
 function start_spinner {
-	if [[ "$flag_use_spinner" = "true" ]]; then
-		if [[ "$spinner_is_running" = "false" ]]; then
-			spinner_is_running=true
-			# $1 : msg to display
-			_spinner "start" "${1}" &
-			# set global spinner pid
-			_sp_pid=$!
-			disown
-		fi
-	fi
+  if [[ "$flag_use_spinner" = "true" ]]; then
+    if [[ "$spinner_is_running" = "false" ]]; then
+      spinner_is_running=true
+      # $1 : msg to display
+      _spinner "start" "${1}" &
+      # set global spinner pid
+      _sp_pid=$!
+      disown
+    fi
+  fi
 }
 
 function stop_spinner {
-	if [[ "$spinner_is_running" = "true" ]]; then
-		spinner_is_running=false
-		# $1 : command exit status
-		_spinner "stop" $1 $_sp_pid
-		unset _sp_pid
-	fi
+  if [[ "$spinner_is_running" = "true" ]]; then
+    spinner_is_running=false
+    # $1 : command exit status
+    _spinner "stop" $1 $_sp_pid
+    unset _sp_pid
+  fi
 }
 
 function sbusy {
-	start_spinner "$1"
+  start_spinner "$1"
 }
 
 function sready {
-	stop_spinner 0
+  stop_spinner 0
 }
 
 sbusy ""
@@ -180,6 +232,9 @@ file_count=0
 flag_tools=
 flag_testing_programs=
 flag_additional_test_name_info=
+flag_pipe_input=()
+flag_pipe_output=()
+flag_no_pipes="true"
 
 
 
@@ -230,8 +285,8 @@ function clean_temp {
 }
 
 function close {
-	sready $1
-	exit $1
+  sready $1
+  exit $1
 }
 
 
@@ -324,26 +379,26 @@ function prepare_input {
   if [[ $param_dir =~ $regex ]]
   then 
     # Link is valid URL so try to download file
-	sready
+  sready
     printf "${B_INFO}Trying to download data from provided url...${E_INFO}\n"
     filename=$(curl -sI  $param_dir | grep -o -E 'filename=.*$' | sed -e 's/filename=//')
     if [[ "$filename" = "" ]]; then
       filename="downloaded_tests.zip"
     fi
     if [[ -f $filename ]]; then
-	  sready
+    sready
       printf "${B_INFO}File already present. Skipping.${E_INFO}\n"
       update_loc "$filename"
     else
       sready
-	  printf "${B_INFO}Download into \"${filename}\"${E_INFO}\n"
+    printf "${B_INFO}Download into \"${filename}\"${E_INFO}\n"
       curl -f -L -o "$filename" $param_dir
       curl_status=$?
       if [ "$curl_status" -eq 0 ]; then
         update_loc "$filename"
       else
         sready
-		printf "${B_ERR}Could not download requested file. :(${E_ERR}\n"
+        printf "${B_ERR}Could not download requested file. :(${E_ERR}\n"
         close 22
       fi
     fi
@@ -351,10 +406,10 @@ function prepare_input {
 
   if [[ -f $param_dir ]]; then
     folder_loc=${param_dir%%.*}
-	
+  
     if [[ ! -d "$folder_loc" ]]; then
       sready
-	  printf "${B_INFO}Test input is zip file -- needs unzipping...${E_INFO}\n"
+      printf "${B_INFO}Test input is zip file -- needs unzipping...${E_INFO}\n"
       printf "${B_INFO}This may take a while...${E_INFO}\n"
       mkdir "$folder_loc"
       unzip -q "$param_dir" -d "$folder_loc"
@@ -366,7 +421,7 @@ function prepare_input {
     best_test_dir=$(autofind_tests "$folder_loc")
     if [[ ${best_test_dir} != '' ]]; then
       sready
-	  printf "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
+      printf "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
       update_loc "$best_test_dir"  
     else
       update_loc "$folder_loc"
@@ -407,7 +462,7 @@ function verify_args {
 
       if [[ $param_prog = '' ]]; then
         sready
-		printf "${B_ERR}Tested program name was not given. (parameter <prog> is missing)${E_ERR}\n"
+        printf "${B_ERR}Tested program name was not given. (parameter <prog> is missing)${E_ERR}\n"
         printf "${B_DEBUG}Possible executables to test:\n\n$possible_executables"
         printf "\n\n${B_ERR}Usage: test <prog> <input_dir> [flags]${E_ERR}\n"
         printf "${B_DEBUG}Use -f option to forcefully proceed.${E_DEBUG}\n"
@@ -416,7 +471,7 @@ function verify_args {
       else
         param_prog=$(echo "$possible_executables" | head -n 1)
         sready
-		printf "${B_DEBUG}Autodected \'$param_prog\' as best test program. Using it.${E_DEBUG}\n"
+        printf "${B_DEBUG}Autodected \'$param_prog\' as best test program. Using it.${E_DEBUG}\n"
       fi
     fi
     if [[ $param_dir = '' ]]; then
@@ -424,21 +479,21 @@ function verify_args {
       best_test_dir=$(autofind_tests ".")
       if [[ ${best_test_dir} = '' ]]; then
         sready
-		printf "${B_ERR}Input directory was not given. (parameter <input_dir> is missing)${E_ERR}\n"
+        printf "${B_ERR}Input directory was not given. (parameter <input_dir> is missing)${E_ERR}\n"
         printf "${B_ERR}Usage: test <prog> <input_dir> [flags]${E_ERR}\n"
         printf "${B_DEBUG}Use -f option to forcefully proceed.${E_DEBUG}\n"
         clean_temp
         close 1
       else
-		sready
+        sready
         #printf "${B_WARN}Input directory was not given. (parameter <input_dir> is missing)${E_WARN}\n"
-		printf "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
+        printf "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
         param_dir="$best_test_dir"
         if [[ "$flag_good_out_path" = "" ]]; then
           flag_good_out_path="$param_dir"
         fi
       fi
-	  #sready
+      #sready
       #printf "${B_ERR}Input directory was not given. (parameter <input_dir> is missing)${E_ERR}\n"
       #printf "${B_ERR}Usage: test <prog> <input_dir> [flags]${E_ERR}\n"
       #printf "${B_DEBUG}Use -f option to forcefully proceed.${E_DEBUG}\n"
@@ -448,11 +503,23 @@ function verify_args {
     if [[ -d $param_dir ]]; then
       echo -en ""
     else
-	  sready
-      printf "${B_ERR}Input directory \"$param_dir\" does not exists.${E_ERR}\n"
-      printf "${B_DEBUG}Use -f option to forcefully proceed.${E_DEBUG}\n"
-      clean_temp
-      close 1
+      sready
+      
+      regex_file_list=$(find -regextype posix-extended -regex "${param_dir}" -print0)  
+      if [[ "$regex_file_list" != "" ]]; then
+        echo -en ""
+      else
+        regex_file_list=$(ls -v $param_dir 2> /dev/null)  
+        if [[ "$regex_file_list" != "" ]]; then
+          echo -en ""
+        else
+          printf "${B_ERR}Input directory \"$param_dir\" does not exists.${E_ERR}\n"
+          printf "${B_DEBUG}Use -f option to forcefully proceed.${E_DEBUG}\n"
+          clean_temp
+          close 1
+        fi
+      fi
+      
     fi
   fi
   if [[ ${flag_always_need_good_err} = 'true' ]]; then
@@ -533,7 +600,7 @@ function find_testing_program {
           command -v "./$param_prog.sh" >/dev/null 2>&1
           if [ "$?" != "0" ]; then
             #sready
-			#printf "${B_ERR}Invalid program name: ${param_prog}. Program not found.${E_ERR}\n";
+            #printf "${B_ERR}Invalid program name: ${param_prog}. Program not found.${E_ERR}\n";
             #printf "${B_ERR}Please verify if the executable name is correct.${E_ERR}"
             #clean_temp
             #close 1
@@ -555,13 +622,13 @@ function find_testing_program {
 
 
 
-function count_input_files {
-  file_count=0
-  for input_file_path in $param_dir/*.in
-  do
-    file_count=$((file_count+1))
-  done
-}
+#function count_input_files {
+#  file_count=0
+#  for input_file_path in $param_dir/*.in
+#  do
+#    file_count=$((file_count+1))
+#  done
+#}
 
 
 
@@ -597,12 +664,13 @@ function print_summary {
 function print_start {
   if [[ $flag_minimal = 'false' ]]; then
     sready
-	printf "\n"
+  printf "\n"
   fi
   if [[ $flag_minimal = 'false' ]]; then
     sready
-	printf "${B_BOLD}Performing tests...${E_BOLD}\n"
-    printf "${B_DEBUG}Call $param_prog $input_prog_flag_acc ${E_DEBUG}\n\n"
+  printf "${B_BOLD}Performing tests...${E_BOLD}\n"
+    prog_short_name=$(shortname "$param_prog")
+    printf "${B_DEBUG}Call $param_prog $input_prog_flag_acc (short name: ${prog_short_name}) ${E_DEBUG}\n\n"
   fi
 }
 
@@ -616,7 +684,7 @@ function test_err {
       if [[ "$flag_good_err_path" != "" ]]; then
         if [ "$good_err_path" ]; then
           diff=$(diff --text --minimal --suppress-blank-empty --strip-trailing-cr --ignore-case --ignore-tab-expansion --ignore-trailing-space --ignore-space-change --ignore-all-space --ignore-blank-lines $err_path $good_err_path)
-		  
+      
           if [[ $diff != '' ]]; then
             was_error=true
             print_error_by_default=false
@@ -625,18 +693,18 @@ function test_err {
             err_message=$(echo -en "$err_message" | sed "s/^/ $B_ERR\|$E_ERR  /g")
             if [[ $flag_extreamely_minimalistic = 'false' ]]; then
               sready
-			  printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $err_path $flag_additional_test_name_info" "${B_ERR}[ERR] Non matching err-output${E_ERR}"
+              printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $err_path $flag_additional_test_name_info" "${B_ERR}[ERR] Non matching err-output${E_ERR}"
             else
-			  sready
+              sready
               printf  "${B_ERR}$err_path $flag_additional_test_name_info${E_ERR}\n"
             fi
             if [[ $flag_very_minimal = 'false' ]]; then
               # We dont want this
               if [[ 'true' = 'false' ]]; then
                 sready
-				printf  "\n  ${B_ERR}_${E_ERR}  \n$err_message\n ${B_ERR}|_${E_ERR}  \n"
+                printf  "\n  ${B_ERR}_${E_ERR}  \n$err_message\n ${B_ERR}|_${E_ERR}  \n"
               else
-				sready
+                sready
                 printf  "$err_message\n"
               fi
             fi
@@ -653,17 +721,17 @@ function test_err {
               if [[ "$not_exists_index" -lt "10" ]]; then
                 if [[ ${flag_extreamely_minimalistic} = 'true' ]]; then
                   sready
-				  printf  "${B_WARN}$good_err_path $flag_additional_test_name_info${E_WARN}\n"
+                  printf  "${B_WARN}$good_err_path $flag_additional_test_name_info${E_WARN}\n"
                 else
-				  sready
-				  want_to_skip_other_programs=true
+                  sready
+                  want_to_skip_other_programs=true
                   printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file" "${B_WARN}[?] $good_err_path not exists${E_WARN}"
                 fi
               fi
             fi
           else
             if [[ "$flag_default_require_err_emptyness" = "true" ]]; then
-			  if [ -s "$err_path" ]; then
+              if [ -s "$err_path" ]; then
                 was_error=true
               fi
             else
@@ -682,9 +750,103 @@ function test_err {
   fi
 }
 
+#
+# Usage: load_prop_variable <variable_prefix> <variable_name> <output_variable>
+#
+function load_prop_variable {
+  input_var_name="${1}${2}"
+  output_var_name="${3}"
+  input_var_value="${!input_var_name}"
+  output_var_value="${!output_var_name}"
+  
+  if [[ "${input_var_value}" != '' ]]; then
+      return_buffer="${return_buffer}${output_var_name}=\"${output_var_value}\"\n"
+      printf "load_prop_variable ${output_var_name} -> ${input_var_value}\n"
+      eval $output_var_name=\$input_var_value
+  fi
+}
 
+function load_global_configuration_file {
+  return_buffer=""
+  global_configuration_file_path="./utest.yaml"
+  if [ -f "$global_configuration_file_path" ]; then
+    #
+    # Load global configuration file
+    #
+    
+    printf "LOAD GLOBAL CONFIURATION FILE ${global_configuration_file_path}\n"
+    configuration_parsed_setup=$(parse_yaml "${global_configuration_file_path}" "global_config_" "false")
+    
+    printf "GLOBAL_CONFIG:\n"
+    printf "$configuration_parsed_setup\n"
+    
+    eval $configuration_parsed_setup
+   
+    
+    if [[ "$global_config_executions_" != "" ]]; then
+      prog_arr_parser_acc=""
+      for prog in "${global_config_executions_[@]}"
+      do
+        printf "prog -> ${prog}\n"
+        if [[ "$prog_arr_parser_acc" = "" ]]; then
+          prog_arr_parser_acc="\"${prog}\""
+        else
+          prog_arr_parser_acc="${prog_arr_parser_acc},\"${prog}\""
+        fi
+      done
+      load_prop_variable "" "prog_arr_parser_acc" "param_prog"
+    fi
+    
+    
+  fi
+  return_buffer=""
+}
 
+function load_single_test_configuration_file {
+  return_buffer=""
+  if [ -f "$single_test_configuration_file_path" ]; then
+    #
+    # Load configuration file for single test execution
+    #
+    
+    short_name=$(shortname "$param_prog")
+    config_prefix="test_config_${short_name}__"
+    
+    printf "LOAD CONFIURATION FILE ${single_test_configuration_file_path}\n"
+    configuration_parsed_setup=$(parse_yaml "${single_test_configuration_file_path}" "test_config_" "false" | grep "$short_name")
+    
+    printf "CONFIG:\n"
+    printf "$configuration_parsed_setup\n"
+    
+    eval $configuration_parsed_setup
+    
+    load_prop_variable "${config_prefix}" "args" "input_prog_flag_acc"
+    load_prop_variable "${config_prefix}" "executable" "param_prog"
+    load_prop_variable "${config_prefix}" "in" "input_file_path"
+    
+    
+    #printf "elelele\n"
+    #printf "$configuration_parsed_setupsss\n"
+    
+    printf "Return buffer:\n${return_buffer}"
+  fi
+}
 
+function unload_single_test_configuration_file {
+  if [ -f "$single_test_configuration_file_path" ]; then
+    #
+    # Unload configuration file for single test execution
+    #
+    configuration_parsed_teardown=$(parse_yaml "${single_test_configuration_file_path}" "test_config_" "true")
+    
+    backup_config_script=$(printf "$configuration_parsed_teardown\n$return_buffer\n")
+    
+    #printf "backup config:\n"
+    #printf "$backup_config_script"
+    
+    eval "$backup_config_script"
+  fi
+}
 
 
 
@@ -771,8 +933,8 @@ function flush_err_messages {
   if [[ "$print_error_by_default" = "true" ]]; then
     err_index=$((err_index+1))
     err_message=$(cat "$err_path")
-	if [[ $flag_extreamely_minimalistic = 'true' ]]; then
-	  push_test_message_error "$input_file"
+  if [[ $flag_extreamely_minimalistic = 'true' ]]; then
+    push_test_message_error "$input_file"
     else
       if [[ $flag_very_minimal = 'true' ]]; then
       push_test_message_error "Error at stderr"
@@ -789,7 +951,7 @@ function abort_if_too_many_errors {
   if [[ "$err_index" -gt 5 ]]; then
     if [[ $flag_always_continue = 'false' ]]; then
       sready
-	  printf "\n${B_WARN}[!] Abort testing +5 errors.${E_WARN}\nDo not use --ta flag to always continue."
+    printf "\n${B_WARN}[!] Abort testing +5 errors.${E_WARN}\nDo not use --ta flag to always continue."
       clean_temp
       close 1
     fi
@@ -901,7 +1063,7 @@ function check_testing_script {
   fi
   if [[ $test_not_exists = 'true' ]]; then
       sready
-	  printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_ERR}[ERR] Testing script does not exists or is invalid command (--tscript). Abort.${E_ERR}"
+    printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_ERR}[ERR] Testing script does not exists or is invalid command (--tscript). Abort.${E_ERR}"
       printf  "%-30s  %s\n" " " "${B_ERR}Used command: $flag_test_out_script${E_ERR}"
 
       clean_temp
@@ -935,7 +1097,7 @@ function check_testing_script_err {
   fi
   if [[ $test_not_exists = 'true' ]]; then
       sready
-	  printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $err_path $flag_additional_test_name_info" "${B_ERR}[ERR] Testing script does not exists or is invalid command (--tscript-err). Abort.${E_ERR}"
+      printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $err_path $flag_additional_test_name_info" "${B_ERR}[ERR] Testing script does not exists or is invalid command (--tscript-err). Abort.${E_ERR}"
       printf  "%-30s  %s\n" " " "${B_ERR}Used command: $flag_test_err_script${E_ERR}"
 
       clean_temp
@@ -971,10 +1133,10 @@ function test_out {
         if [[ "$not_exists_index" -lt "10" ]]; then
           if [[ ${flag_extreamely_minimalistic} = 'true' ]]; then
             sready
-			printf  "${B_WARN}$input_file${E_WARN}\n"
+            printf  "${B_WARN}$input_file${E_WARN}\n"
           else
-		    sready
-			want_to_skip_other_programs=true
+            sready
+            want_to_skip_other_programs=true
             printf  "\n%-28s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG} $input_file" "${B_WARN}[?] $good_out_path not exists${E_WARN}"
           fi
         fi
@@ -987,10 +1149,41 @@ function print_tooling_additional_test_info {
   if [[ $tooling_additional_test_info != '' ]]; then
     tooling_message=$(echo -en "$tooling_additional_test_info" | sed "s/^/   /g")
     sready
-	printf "${B_DEBUG}${tooling_message}${E_DEBUG}\n"
+  printf "${B_DEBUG}${tooling_message}${E_DEBUG}\n"
   fi
 }
 
+#
+# Usage: run_program_pipe <input_file> <output_file> <pipes>
+#
+function run_program_pipe {
+  input_orig="${1}"
+  input="${2}"
+  output="${2}.temp"
+
+  # Copy input to piped input file
+  cp -f "$input_orig" "$input"
+  
+  if [[ "$3" != "" ]]; then
+    for pipe in "$3"
+    do
+      
+      #
+      # Pipe file from $input -> to $output
+      #
+      eval $pipe
+      
+      # Copy result back from output to input
+      # then remove output file
+      if [[ -f "$output" ]]; then
+        cp -f "$output" "$input"
+      fi
+      rm -f "$output"
+      
+      
+    done
+  fi
+}
 
 function run_program {
 
@@ -1000,8 +1193,26 @@ function run_program {
     tool_time_data_stime_start=`date +%s%3N`
   fi
 
-  r=$($param_prog $input_prog_flag_acc < $input_file_path 1> $out_path 2> $err_path)
+  r=""
+  
+  # There are no pipes used so do not operate on files
+  if [[ "$flag_no_pipes" = "true" ]]; then
+    r=$($param_prog $input_prog_flag_acc < "${input_file_path}" 1> "${out_path}" 2> $err_path)
+  else
+     # Pipe input
+    run_program_pipe "$input_file_path" "${input_file_path}.piped" "${flag_pipe_input[@]}"
+    
+    r=$($param_prog $input_prog_flag_acc < "${input_file_path}.piped" 1> "${out_path}.piped" 2> $err_path)
 
+    # Pipe output
+    run_program_pipe "${out_path}.piped" "${out_path}" "${flag_pipe_output[@]}"
+    
+    # Remove unwanted piping files
+    rm -f "${input_file_path}.piped"
+    rm -f "${out_path}.piped"
+  fi
+  
+  
   if [[ $flag_tools_use_stime = 'true' ]]; then
     tool_time_data_stime_end=`date +%s%3N`
     push_test_message_tooling_info "$((tool_time_data_stime_end-tool_time_data_stime_start))ms"
@@ -1054,6 +1265,9 @@ function run_program {
 #shift
 #flag_good_out_path=$param_dir
 
+#
+# Load CLI arguments
+#
 
 param_counter=0
 tflags_loading_enabled=true
@@ -1087,7 +1301,7 @@ do
       --tsty-format) flag_formating=sty ;;
       --tterm-format) flag_formating=term ;;
       --tnone-format) flag_formating=none ;;
-	  --tno-spinner) flag_use_spinner=false ;;
+      --tno-spinner) flag_use_spinner=false ;;
       --tc) flag_formating=none ;;
       --tless-info) flag_skip_ok=true ;;
       --tout) shift; flag_out_path="$1"; flag_out_temp=false ;;
@@ -1097,6 +1311,8 @@ do
       --ts) flag_skip_ok=true ;;
       --tn) flag_skip_summary=true ;;
       --ta) flag_always_continue=false ;;
+      --tpipe-out) shift; flag_no_pipes="false"; flag_pipe_output+=("$1") ;;
+      --tpipe-in) shift; flag_no_pipes="false"; flag_pipe_input+=("$1") ;;
       --tm) flag_skip_ok=true; flag_minimal=true ;;
       --tmm) flag_skip_ok=true; flag_minimal=true; flag_very_minimal=true ;;
       --tmmm) flag_skip_ok=true; flag_minimal=true; flag_very_minimal=true; flag_extreamely_minimalistic=true ;;
@@ -1139,12 +1355,13 @@ done
 
 sbusy
 set_format
+load_global_configuration_file
 prepare_input
 verify_args
 clean_out_err_paths
 collect_testing_programs
 #find_testing_program
-count_input_files
+#count_input_files
 print_start
 
 sbusy
@@ -1156,18 +1373,47 @@ not_exists_index=0
 not_exists_but_created_index=0
 tooling_additional_test_info=
 
+regex_file_matching="false"
+
 #
 # input file list sorted by ascending file size
 #
 #input_file_list=`ls -vhS $param_dir/*.in | tr ' ' '\n'|tac|tr '\n' ' '`
-input_file_list=`ls -v $param_dir/*.in`
+input_file_list=$(ls -v $param_dir/*.in 2> /dev/null)
+input_file_list_err_code=$?
+
+if [[ "$input_file_list_err_code" != "0" ]]; then
+  #
+  # Obtain file list by using globs
+  #
+  input_file_list=$(ls -v $param_dir 2> /dev/null)
+  input_file_list_err_code=$?
+  regex_file_matching="true"
+fi
+
+if [[ "$input_file_list_err_code" != "0" ]]; then
+  #
+  # Obtain file list by using regexes
+  #
+  input_file_list=$(find -regextype posix-extended -regex "${param_dir}" -printf "%p  ")
+  input_file_list_err_code=$?
+  regex_file_matching="true"
+fi
+
+
+# Count input files
+file_count=0
+for input_file_path in $input_file_list
+do
+  file_count=$((file_count+1))
+done
 
 for input_file_path in $input_file_list
 do
   prog_iter=0
   while [ $prog_iter -lt $flag_testing_programs_len ];
   do
-	sbusy
+    sbusy
     prog=${flag_testing_programs[${prog_iter}]}
     #echo "|===> Prog ${prog}"
     if [ $flag_testing_programs_len -gt 1 ]; then
@@ -1176,18 +1422,56 @@ do
       flag_additional_test_name_info=""
     fi
     param_prog="$prog"
+    
+    
+    param_prog_eval=$(eval echo $param_prog)
+    param_prog="$param_prog_eval"
+    
+    #printf "Evaluated prog is -> $param_prog_eval\n"
+    
     if [[ -e $input_file_path ]]; then
+    
+      #
+      # When we use regexes 
+      #
+      if [[ "$regex_file_matching" = "true" ]]; then
+        if [[ "$flag_good_out_path" = "$param_dir" ]]; then
+          flag_good_out_path=$(dirname "$input_file_path")
+        fi
+        if [[ "$flag_good_err_path" = "$param_dir" ]]; then
+          flag_good_err_path=$(dirname "$input_file_path")
+        fi
+      fi
+    
+    
       #TEST_RESULTS
       input_file=$(basename $input_file_path)
+      
+      input_file_name=${input_file/.in/}
       good_out_path=$flag_good_out_path/${input_file/.in/.out}
       good_err_path=$flag_good_err_path/${input_file/.in/.err}
       out_path=$flag_out_path/${input_file/.in/.out}
       err_path=$flag_err_path/${input_file/.in/.err}
-
+      single_test_configuration_file_path=${input_file_path/.in/.config.yaml}
+      
+      # If input file name does not contain .in extension
+      if [[ "${input_file/.in/}" = "$input_file" ]]; then
+        input_file_name=${input_file}
+        good_out_path=$flag_good_out_path/${input_file}.out
+        good_err_path=$flag_good_err_path/${input_file}.err
+        out_path=$flag_out_path/${input_file}.out
+        err_path=$flag_err_path/${input_file}.err
+        single_test_configuration_file_path=${input_file_path}.config.yaml
+      fi
+      
+      
+      return_buffer=""
+      load_single_test_configuration_file
       run_program
+      unload_single_test_configuration_file
 
       was_error=false
-	  want_to_skip_other_programs=false
+      want_to_skip_other_programs=false
       print_error_by_default=true
       test_err
       if [[ "$was_error" = "true" ]]; then
@@ -1198,14 +1482,14 @@ do
         test_out
         print_tooling_additional_test_info
       fi
-	  if [[ "$want_to_skip_other_programs" = "true" ]]; then
-		break
-	  fi
+      if [[ "$want_to_skip_other_programs" = "true" ]]; then
+        break
+      fi
     fi
     clean_temp_content
     prog_iter=$((prog_iter+1))
     push_test_message_next_program
-	sready
+    sready
   done
   
   sbusy

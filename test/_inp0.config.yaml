@@ -1,0 +1,2 @@
+totest_sh:
+    args: $input_file_name.hehe

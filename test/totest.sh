@@ -1,5 +1,7 @@
 #!/bin/bash
 
-printf "15\n"
+text="15 ${1}"
+
+printf "$text\n"
 
 exit 0
