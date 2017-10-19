@@ -1188,29 +1188,28 @@ function run_program_pipe {
 function run_program {
 
   tooling_additional_test_info=""
-
+  r=""
+  
+  # Perpare input piping
+  if [[ "$flag_no_pipes" != "true" ]]; then
+    # Pipe input
+    run_program_pipe "$input_file_path" "${input_file_path}.piped" "${flag_pipe_input[@]}"
+  fi
+  
   if [[ $flag_tools_use_stime = 'true' ]]; then
     tool_time_data_stime_start=`date +%s%3N`
   fi
 
-  r=""
+  
   
   # There are no pipes used so do not operate on files
   if [[ "$flag_no_pipes" = "true" ]]; then
     r=$($param_prog $input_prog_flag_acc < "${input_file_path}" 1> "${out_path}" 2> $err_path)
   else
-     # Pipe input
-    run_program_pipe "$input_file_path" "${input_file_path}.piped" "${flag_pipe_input[@]}"
-    
     r=$($param_prog $input_prog_flag_acc < "${input_file_path}.piped" 1> "${out_path}.piped" 2> $err_path)
-
-    # Pipe output
-    run_program_pipe "${out_path}.piped" "${out_path}" "${flag_pipe_output[@]}"
-    
-    # Remove unwanted piping files
-    rm -f "${input_file_path}.piped"
-    rm -f "${out_path}.piped"
   fi
+  
+  
   
   
   if [[ $flag_tools_use_stime = 'true' ]]; then
@@ -1254,6 +1253,16 @@ function run_program {
   if [[ $flag_tools_use_size = 'true' ]]; then
     inputFileSize=$(stat -c%s "${input_file_path}")
     push_test_message_tooling_info "<${inputFileSize} bytes"
+  fi
+  
+  # Do output piping
+  if [[ "$flag_no_pipes" != "true" ]]; then
+    # Pipe output
+    run_program_pipe "${out_path}.piped" "${out_path}" "${flag_pipe_output[@]}"
+    
+    # Remove unwanted piping files
+    rm -f "${input_file_path}.piped"
+    rm -f "${out_path}.piped"
   fi
 
 
