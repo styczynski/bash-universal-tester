@@ -249,6 +249,8 @@ prog2:
 
 ```
 
+### Single test configuration
+
 You can also configure environment for **single test case**!
 Just put `xyz.config.yaml` file next to your input file `xyz.in`.
 
@@ -256,7 +258,7 @@ All options of config file for single test are listed below:
 
 ```yaml
 
-totest_sh:
+prog2:
     args: %input_file_name some additional args
     in: override_input_file.in
 

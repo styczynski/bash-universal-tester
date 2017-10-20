@@ -898,7 +898,7 @@ function load_single_test_configuration_file {
   # Load global config
   load_prop_variable "${global_config_prefix}" "command" "param_prog"
   load_prop_variable "${global_config_prefix}" "args" "input_prog_flag_acc"
-  load_prop_variable "${global_config_prefix}" "in" "input_file_path"
+  load_prop_variable "${global_config_prefix}" "input" "input_file_path"
   
   load_prop_variable_arr "${global_config_prefix}" "pipes_out_" "flag_pipe_output"
   load_prop_variable_arr "${global_config_prefix}" "pipes_out_err_" "flag_pipe_err_output"
@@ -931,7 +931,16 @@ function load_single_test_configuration_file {
     load_prop_variable "" "param_prog" "param_prog_call_name" "false"
     load_prop_variable "${config_prefix}" "command" "param_prog"
     
-    load_prop_variable "${config_prefix}" "in" "input_file_path"
+    
+    load_prop_variable "${config_prefix}" "input" "input_file_path"
+    
+    load_prop_variable "${config_prefix}" "good_output" "flag_good_out_path" "false"
+    load_prop_variable "${config_prefix}" "good_err" "flag_good_err_path" "false"
+      
+    load_prop_variable "${config_prefix}" "need_error_files" "flag_always_need_good_err" "false"
+      
+    load_prop_variable "${config_prefix}" "testing_script_out" "flag_test_out_script"
+    load_prop_variable "${config_prefix}" "testing_script_err" "flag_test_err_script"
     
     
     #printf "elelele\n"
