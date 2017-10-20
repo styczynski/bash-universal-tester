@@ -48,25 +48,25 @@ And sometimes gives suggestions what program you may want to test.
 
 To test input folder (only .in and .out): 
 
-	`utest <prog> <folder>`
+	utest <prog> <folder>
 	
 ### Basic in + out + ignore err (err is not checked anytime)
 
 To test input folder (only .in and .out): 
 
-	`utest --tierr <prog> <folder>`
+	utest --tierr <prog> <folder>
 
 ### Basic in + out + err (missing .err file cause error)
 
 To test input folder (.in, .out, and .err files): 
 
-	`utest --tnerr <prog> <folder>`
+	utest --tnerr <prog> <folder>
 
 ### Basic in + out + err (missing .err files are ignored)
 
 To test input folder (.in, .out, and .err files): 
 
-	`utest --tgerr <folder> <prog> <folder>`
+	utest --tgerr <folder> <prog> <folder>
 
 ### Globbing input files
 
@@ -85,7 +85,7 @@ tests
 We want to feed utest with input files nested in subdirectories.
 For that purpose just use:
 
-	`utest <prog> "./tests/**/*.in"`
+	utest <prog> "./tests/**/*.in"
 	
 **Note that globbing must be provided in quotes otherwise it will be parsed by shell and won't work!**
 	
@@ -110,7 +110,7 @@ We must tell utest where to find output files.
 We use `--tgout` flag that utilizes dynamic variable to generate output path.
 You can read more about dynamic variables in *variables* section.
 
-	`utest <prog> --tgout "%input_file_folder/out" "./tests/**/input.txt"`
+	utest <prog> --tgout "%input_file_folder/out" "./tests/**/input.txt"
 	
 **Note that globbing must be provided in quotes otherwise it will be parsed by shell and won't work!**
 	
@@ -138,6 +138,9 @@ You can read more about dynamic variables in *variables* section.
 | **--tsty-format**                 |            | Make tester use <i>!error!</i>, <i>!info!</i> etc. output format |
 | **--tterm-format**                |            | Make tester use (default) <i>term</i> color formatting |
 | **--tc**<br>**--tnone-format**    |            | Make tester use <i>clean</i> (only-text) formatting |
+| **--tpipe-in**                    |*[command]* | Use preprocessing of input. See <b>Piping</b> section |
+| **--tpipe-out**                   |*[command]* | Use postprocessing of output. See <b>Piping</b> section |
+| **--tpipe-out-err**               |*[command]* | Use postprocessing of output error stream. See <b>Piping</b> section |
 | **--ts**                          |            | Skips always oks |
 | **--tierr**                       |            | Always ignore stderr output |
 | **--tgout**                       |  *[dir]*   | Sets <i>(good)</i> .out input directory<br>(default is the same as dir/inputs will be still found in dir location/use when .out and .in are in separate locations) |
@@ -271,4 +274,4 @@ You must identify program by the command it calls.
 
 [screenshot 1]: https://raw.githubusercontent.com/styczynski/bash-universal-tester/master/static/screenshots/screenshot1.png
 
-[link download latest]: https://github.com/styczynski/bash-universal-tester/archive/1.0.0.zip
+[link download latest]: https://github.com/styczynski/bash-universal-tester/archive/1.6.2.zip
