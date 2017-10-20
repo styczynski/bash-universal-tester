@@ -1,0 +1,13 @@
+input: test/*.in
+good_output: test/%input_file_name.out
+need_error_files: false
+executions:
+    - prog1
+    - prog2
+prog1:
+    command: ./test/totest.sh
+    args: %input_file_name
+    pipes_out:
+        - echo 15 > %output
+prog2:
+    command: echo 15

@@ -209,6 +209,58 @@ utest.sh --tpipe-out "cat %input | sort > %output" <prog> <folder>
 Advantage of pipes are that you do not modify in/out files directly. 
 And you can test programs that may potentailly give not exactly the same answers but which are still correct.
 
+## Configuration file
+
+### Global configuration
+
+Instead of passing all parameters by command line we offer the ability to put everything into single *YAML* file!
+
+Utest seek for `utest.yaml` file in current directory. It can contain all configuration available via
+command line switches and flags!
+
+All config options are listed there: 
+
+```yaml
+
+input: test/*.in
+good_output: test/%input_file_name.out
+good_err: test/%input_file_name.err
+need_error_files: false
+testing_script_out: ignore
+testing_script_err: ignore
+executions:
+    - prog1
+    - prog2
+prog1:
+    command: ./test/totest.sh
+    args: %input_file_name
+    pipes_out:
+        - echo 123 > %output
+    pipes_in:
+        - echo 123 > %output
+    pipes_out_err:
+        - echo 123 > %output
+        - cat %input | echo 123 > %output
+prog2:
+    command: echo 99
+
+```
+
+You can also configure environment for **single test case**!
+Just put `xyz.config.yaml` file next to your input file `xyz.in`.
+
+All options of config file for single test are listed below: 
+
+```yaml
+
+totest_sh:
+    args: %input_file_name some additional args
+    in: override_input_file.in
+
+```
+
+You must identify program by the command it calls. 
+
 [badge sts]: https://img.shields.io/badge/-styczynsky_digital_systems-blue.svg?style=flat-square&logoWidth=20&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAABYAAAAXCAYAAAAP6L%2BeAAAABmJLR0QA%2FwD%2FAP%2BgvaeTAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAB3RJTUUH4AgSEh0nVTTLngAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAAAm0lEQVQ4y2Pc%2Bkz2PwMNAAs2wVMzk4jSbJY%2BD6ccEwONACMsKIh1JSEgbXKeQdr4PO1cPPQMZiGkoC7bkCQD7%2Fx7znDn35AOClK9PEJSBbNYAJz999UGrOLocsM0KHB5EZ%2FXPxiVMDAwMDD8SP3DwJA6kFka5hJCQOBcDwMDAwPDm3%2FbGBj%2BbR8tNrFUTbiAB8tknHI7%2FuTilAMA9aAwA8miDpgAAAAASUVORK5CYII%3D
 
 [badge download]: https://img.shields.io/badge/-download_me!-green.svg?style=flat-square&logoWidth=10&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAABkAAAArCAYAAACNWyPFAAAABmJLR0QA%2FwD%2FAP%2BgvaeTAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAB3RJTUUH4AgTDjEFFOXcpQAAAM1JREFUWMPt2EsOgzAMBFDPJHD%2F80Jid1G1KpR8SqKu7C2QJzwWsoCZSWedb0Tvg5Q%2FlCOOOOKII4444ogjjvxW8bTjYtK57zNTSoCdNm5VBcmRhdua7SJpKaXhN2hmEmO0fd%2BnANXgl2WxbduGAVUFVbUY9rquPVARyDmDpJCktKBK66pACOE5Ia%2FhUlUhaTPm9xM4ZEJScs6YDXwFH0IYgq6Ay%2Bm6C5WAQyYXo9edUQ2oIr1Q5TPUh4iImJkAsMI1AO3O4u4fiV5AROQBGVB7Fu2akxMAAAAASUVORK5CYII%3D

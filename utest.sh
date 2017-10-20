@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="1.6.2"
+VERSION="1.7.0"
 
 # Dependencies
 
@@ -52,7 +52,7 @@ parse_yaml() {
 # for tested program
 
 function shortname {
-  short_name=$(basename "$1" | awk -F. '{print $1"_"$2}')
+  short_name=$(basename "$1" | tr . _)
   printf "$short_name"
 } 
 
@@ -113,7 +113,8 @@ function _spinner() {
         sp='\|/-'
         delay=${SPINNER_DELAY:-0.15}
 
-        echo -ne "  "
+        #echo -ne "  "
+        printf "\n "
         while :
         do
           printf "\b${sp:i++%${#sp}:1}"
@@ -128,21 +129,23 @@ function _spinner() {
             if [[ -z ${3} ]]; then
                 #echo "spinner is not running.."
                 #exit 1
-        #echo -e ""
-        sleep 0
-      else
-        kill -9 $3 > /dev/null 2>&1
-        while kill -0 $3 2>/dev/null; do sleep 0.005; done
-        # inform the user upon success or failure
-        echo -ne "\b"
-        #if [[ $2 -eq 0 ]]; then
-        #  echo -en "${green}${on_success}${nc}"
-        #else
-        #  echo -en "${red}${on_fail}${nc}"
-        #fi
-        #echo -e ""
-            fi
-            ;;
+                #echo -e ""
+                sleep 0
+              else
+                kill -9 $3 > /dev/null 2>&1
+                while kill -0 $3 2>/dev/null; do sleep 0.005; done
+                sleep 0.005
+                printf "\b\b\b   \b\b\b"
+                # inform the user upon success or failure
+                #echo -ne "\b"
+                #if [[ $2 -eq 0 ]]; then
+                #  echo -en "${green}${on_success}${nc}"
+                #else
+                #  echo -en "${red}${on_fail}${nc}"
+                #fi
+                #echo -e ""
+              fi
+              ;;
         *)
             echo "invalid argument, try {start/stop}"
             exit 1
@@ -151,7 +154,7 @@ function _spinner() {
 }
 
 spinner_is_running=false
-flag_use_spinner=false
+flag_use_spinner=true
 
 function start_spinner {
   if [[ "$flag_use_spinner" = "true" ]]; then
@@ -235,7 +238,8 @@ flag_additional_test_name_info=
 flag_pipe_input=()
 flag_pipe_output=()
 flag_pipe_err_output=()
-flag_no_pipes="true"
+# Should be changed
+flag_no_pipes="false"
 flag_full_in_path_in_desc="false"
 
 flag_override_good_out_file=
@@ -267,6 +271,10 @@ E_OK=
 
 TEXT_OK="OK"
 
+# TODO REMOVE
+#sleep 1
+#sready
+#exit 22
 
 function clean_temp_content {
   if [[ ${flag_out_temp} = 'true' ]]; then
@@ -775,20 +783,58 @@ function evalspecplain {
 }
 
 #
-# Usage: load_prop_variable <variable_prefix> <variable_name> <output_variable>
+# Usage: load_prop_variable <variable_prefix> <variable_name> <output_variable> <false_to_disable_parsing>
 #
 function load_prop_variable {
   input_var_name="${1}${2}"
   output_var_name="${3}"
-  input_var_value="${!input_var_name}"
+  input_var_value_raw="${!input_var_name}"
+  input_var_value="$input_var_value_raw"
+  if [[ "$4" != "false" ]]; then
+    input_var_value=$(evalspecplain "$input_var_value_raw")
+  fi
   output_var_value="${!output_var_name}"
   
   if [[ "${input_var_value}" != '' ]]; then
-      return_buffer="${return_buffer}${output_var_name}=\"${output_var_value}\"\n"
-      #printf "load_prop_variable ${output_var_name} -> ${input_var_value}\n"
-      eval $output_var_name=\$input_var_value
+    return_buffer="${output_var_name}=\"${output_var_value}\"\n${return_buffer}"
+    #printf "load_prop_variable ${output_var_name} -> ${input_var_value}\n"
+    eval $output_var_name="\$input_var_value"
   fi
 }
+
+#
+# Usage: load_prop_value <value> <output_variable> <false_to_disable_parsing>
+#
+function load_prop_value {
+    temp_prop_variable_cap="${1}"
+    load_prop_variable "" "temp_prop_variable_cap" "${2}" "{3}"
+    temp_prop_variable_cap=""
+}
+
+#
+# Usage: load_prop_variable_arr <variable_prefix> <variable_name> <output_variable>
+#
+function load_prop_variable_arr {
+  input_var_name="${1}${2}"
+  output_var_name="${3}"
+  input_var_value_raw=$(eval echo "\"\${${input_var_name}[@]}\"")
+  #printf "_name => $input_var_name\n"
+  #printf "_raw => $input_var_value_raw\n"
+  input_var_value="$input_var_value_raw"
+  #input_var_value=$(evalspecplain "$input_var_value_raw")
+  output_var_value="${!output_var_name}"
+  
+  if [[ "${input_var_value}" != '' ]]; then
+      return_buffer="${output_var_name}=\"${output_var_value}\"\n${return_buffer}"
+      #printf "load_prop_variable ${output_var_name} -> ${input_var_value}\n"
+      
+      #eval $output_var_name=\$input_var_value
+      eval $output_var_name='$input_var_value'
+      
+      #printf "cur val => ${!output_var_name}\n"
+  fi
+}
+
 
 function load_global_configuration_file {
   return_buffer=""
@@ -801,8 +847,20 @@ function load_global_configuration_file {
     #printf "LOAD GLOBAL CONFIURATION FILE ${global_configuration_file_path}\n"
     configuration_parsed_setup=$(parse_yaml "${global_configuration_file_path}" "global_config_" "false")
     
-    evalspec "$configuration_parsed_setup"
-   
+    #printf "Global setup file contents:\n$configuration_parsed_setup\n"
+    eval "$configuration_parsed_setup"
+    
+    load_prop_variable "global_config_" "input" "param_dir" "false"
+    load_prop_variable "global_config_" "good_output" "flag_good_out_path" "false"
+    load_prop_variable "global_config_" "good_err" "flag_good_err_path" "false"
+      
+    load_prop_variable "global_config_" "need_error_files" "flag_always_need_good_err" "false"
+      
+    load_prop_variable "global_config_" "testing_script_out" "flag_test_out_script"
+    load_prop_variable "global_config_" "testing_script_err" "flag_test_err_script"
+    
+    
+    #printf "HERE flag_good_out_path => ${flag_good_out_path}\n"
     
     if [[ "$global_config_executions_" != "" ]]; then
       prog_arr_parser_acc=""
@@ -825,13 +883,37 @@ function load_global_configuration_file {
 
 function load_single_test_configuration_file {
   return_buffer=""
+  
+  short_name=$(shortname "$param_prog")
+  if [[ "$param_prog_call_name" != "" ]]; then
+    short_name=$(shortname "$param_prog_call_name")
+  fi
+  #printf "short_name :=> $short_name\n"
+  
+  config_prefix="test_config_${short_name}__"
+  global_config_prefix="global_config_${short_name}__"
+  
+  #printf "glob config prefix: ${global_config_prefix}test\n"
+  
+  # Load global config
+  load_prop_variable "${global_config_prefix}" "command" "param_prog"
+  load_prop_variable "${global_config_prefix}" "args" "input_prog_flag_acc"
+  load_prop_variable "${global_config_prefix}" "in" "input_file_path"
+  
+  load_prop_variable_arr "${global_config_prefix}" "pipes_out_" "flag_pipe_output"
+  load_prop_variable_arr "${global_config_prefix}" "pipes_out_err_" "flag_pipe_err_output"
+  load_prop_variable_arr "${global_config_prefix}" "pipes_in_" "flag_pipe_input"
+  
+  #load_prop_variable "${global_config_prefix}" "testing_script_out" "flag_test_out_script"
+  #load_prop_variable "${global_config_prefix}" "testing_script_err" "flag_test_err_script"
+  
+  
+  #flag_test_out_script
+  
   if [ -f "$single_test_configuration_file_path" ]; then
     #
     # Load configuration file for single test execution
     #
-    
-    short_name=$(shortname "$param_prog")
-    config_prefix="test_config_${short_name}__"
     
     #printf "LOAD CONFIURATION FILE ${single_test_configuration_file_path}\n"
     configuration_parsed_setup=$(parse_yaml "${single_test_configuration_file_path}" "test_config_" "false" | grep "$short_name")
@@ -839,10 +921,16 @@ function load_single_test_configuration_file {
     #printf "CONFIG:\n"
     #printf "$configuration_parsed_setup\n"
     
-    evalspec "$configuration_parsed_setup"
+    eval "$configuration_parsed_setup"
     
     load_prop_variable "${config_prefix}" "args" "input_prog_flag_acc"
-    load_prop_variable "${config_prefix}" "executable" "param_prog"
+    
+    #printf "input_prog_flag_acc ==> ${input_prog_flag_acc}\n"
+    
+    # Sotre call name of prog
+    load_prop_variable "" "param_prog" "param_prog_call_name" "false"
+    load_prop_variable "${config_prefix}" "command" "param_prog"
+    
     load_prop_variable "${config_prefix}" "in" "input_file_path"
     
     
@@ -854,13 +942,18 @@ function load_single_test_configuration_file {
 }
 
 function unload_single_test_configuration_file {
+  
+  # Backup pre-global settings
+  backup_global_config_script=$(printf "$return_buffer")
+  eval "$backup_global_config_script"
+  
   if [ -f "$single_test_configuration_file_path" ]; then
     #
     # Unload configuration file for single test execution
     #
     configuration_parsed_teardown=$(parse_yaml "${single_test_configuration_file_path}" "test_config_" "true")
     
-    backup_config_script=$(printf "$configuration_parsed_teardown\n$return_buffer\n")
+    backup_config_script=$(printf "$configuration_parsed_teardown")
     
     #printf "backup config:\n"
     #printf "$backup_config_script"
@@ -933,6 +1026,7 @@ function push_test_message_next_program {
 }
 
 function flush_test_messages {
+  sready
   echo -en "${message_accumulator}"
   message_accumulator=""
   message_last_file_head=""
@@ -972,7 +1066,7 @@ function abort_if_too_many_errors {
   if [[ "$err_index" -gt 5 ]]; then
     if [[ $flag_always_continue = 'false' ]]; then
       sready
-    printf "\n${B_WARN}[!] Abort testing +5 errors.${E_WARN}\nDo not use --ta flag to always continue."
+      printf "\n${B_WARN}[!] Abort testing +5 errors.${E_WARN}\nDo not use --ta flag to always continue."
       clean_temp
       close 1
     fi
@@ -1084,7 +1178,7 @@ function check_testing_script {
   fi
   if [[ $test_not_exists = 'true' ]]; then
       sready
-    printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_ERR}[ERR] Testing script does not exists or is invalid command (--tscript). Abort.${E_ERR}"
+      printf  "%-35s  %s\n" "${B_DEBUG}[$file_index/$file_count]${E_DEBUG}  $input_file $flag_additional_test_name_info" "${B_ERR}[ERR] Testing script does not exists or is invalid command (--tscript). Abort.${E_ERR}"
       printf  "%-30s  %s\n" " " "${B_ERR}Used command: $flag_test_out_script${E_ERR}"
 
       clean_temp
@@ -1170,7 +1264,7 @@ function print_tooling_additional_test_info {
   if [[ $tooling_additional_test_info != '' ]]; then
     tooling_message=$(echo -en "$tooling_additional_test_info" | sed "s/^/   /g")
     sready
-  printf "${B_DEBUG}${tooling_message}${E_DEBUG}\n"
+    printf "${B_DEBUG}${tooling_message}${E_DEBUG}\n"
   fi
 }
 
@@ -1490,6 +1584,7 @@ do
       #
       flag_good_out_path_unparsed=$flag_good_out_path
       flag_good_err_path_unparsed=$flag_good_err_path
+      
       flag_good_out_path=$(evalspecplain "$flag_good_out_path")
       flag_good_err_path=$(evalspecplain "$flag_good_err_path")
       

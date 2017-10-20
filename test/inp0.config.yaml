@@ -1,0 +1,3 @@
+prog2:
+    command: echo THIS IS OVERRIDEN
+    args: INPUT %input_file_name
