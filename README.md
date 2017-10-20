@@ -222,4 +222,4 @@ And you can test programs that may potentailly give not exactly the same answers
 
 [screenshot 1]: https://raw.githubusercontent.com/styczynski/bash-universal-tester/master/static/screenshots/screenshot1.png
 
-[link download latest]: https://github.com/styczynski/bash-universal-tester/archive/1.0.0.zip
+[link download latest]: https://github.com/styczynski/bash-universal-tester/archive/1.6.2.zip
