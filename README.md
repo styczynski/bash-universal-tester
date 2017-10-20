@@ -68,6 +68,53 @@ To test input folder (.in, .out, and .err files):
 
 	`utest --tgerr <folder> <prog> <folder>`
 
+### Globbing input files
+
+Let's suppose we have the following file structure: 
+```
+tests
+|- test1 
+|  |- input.in
+|  \- output.out
+|
+|- test2
+   |- input.in
+   \- output.out
+```
+
+We want to feed utest with input files nested in subdirectories.
+For that purpose just use:
+
+	`utest <prog> "./tests/**/*.in"`
+	
+**Note that globbing must be provided in quotes otherwise it will be parsed by shell and won't work!**
+	
+### Custom input layout
+
+Let's suppose we have the following file structure (even more unfriendly!): 
+
+```
+tests
+|- test1 
+|  |- input.txt
+|  \- out
+|
+|- test2
+   |- input.txt
+   \- out
+```
+
+We want to feed utest with input files nested in subdirectories.
+And the input files have custom extensions.
+We must tell utest where to find output files.
+We use `--tgout` flag that utilizes dynamic variable to generate output path.
+You can read more about dynamic variables in *variables* section.
+
+	`utest <prog> --tgout "%input_file_folder/out" "./tests/**/input.txt"`
+	
+**Note that globbing must be provided in quotes otherwise it will be parsed by shell and won't work!**
+	
+	
 ## Advanced usage
 
 `utest [test_flags] <prog> <dir> [prog_flags]`
@@ -122,6 +169,45 @@ About minimalistic modes:
 
 * In **--tmmm** only names of error files are printed / Nothing at output on success
 
+## Variables
+
+In `<prog>`, `--tgerr <dir>`, `--tgout <dir>` and config files you can use special dynamic variables.
+These are the following: 
+
+| name                   | description                                                      |
+|------------------------|------------------------------------------------------------------|
+| **%input_file**        | Current input file name along with extension                     |
+| **%input_file_name**   | Current input file without .in or .out extension                 |
+| **%input_file_folder** | Directory of current input file                                  |
+| **%input_file_path**   | Full input path                                                  |
+| **%input_file_list**   | List of all input files (separated by space) that will be loaded |
+| **%file_count**        | Number of all input files that will be loaded                    |
+
+Example usage: 
+```
+utest "echo %input_file" <folder>
+```
+
+## Piping
+
+Utest provides easy way to preprocess your input file or postprocess program outputs. 
+
+All you have to do is to use `--tpipe-in <command>`, `--tpipe-out <command>` or `--tpipe-out-err <command>`. 
+
+Pipes are provided with additional variables: 
+
+| name                   | description                                  |
+|------------------------|----------------------------------------------|
+| **%input**             | Pipe program input file path                 |
+| **%output**            | Pipe program output file path                |
+
+For example let's sort program output alphabetically: 
+```
+utest.sh --tpipe-out "cat %input | sort > %output" <prog> <folder>
+```
+
+Advantage of pipes are that you do not modify in/out files directly. 
+And you can test programs that may potentailly give not exactly the same answers but which are still correct.
 
 [badge sts]: https://img.shields.io/badge/-styczynsky_digital_systems-blue.svg?style=flat-square&logoWidth=20&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAABYAAAAXCAYAAAAP6L%2BeAAAABmJLR0QA%2FwD%2FAP%2BgvaeTAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAB3RJTUUH4AgSEh0nVTTLngAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAAAm0lEQVQ4y2Pc%2Bkz2PwMNAAs2wVMzk4jSbJY%2BD6ccEwONACMsKIh1JSEgbXKeQdr4PO1cPPQMZiGkoC7bkCQD7%2Fx7znDn35AOClK9PEJSBbNYAJz999UGrOLocsM0KHB5EZ%2FXPxiVMDAwMDD8SP3DwJA6kFka5hJCQOBcDwMDAwPDm3%2FbGBj%2BbR8tNrFUTbiAB8tknHI7%2FuTilAMA9aAwA8miDpgAAAAASUVORK5CYII%3D
 

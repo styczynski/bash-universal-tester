@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="1.5.0"
+VERSION="1.6.2"
 
 # Dependencies
 
@@ -234,8 +234,12 @@ flag_testing_programs=
 flag_additional_test_name_info=
 flag_pipe_input=()
 flag_pipe_output=()
+flag_pipe_err_output=()
 flag_no_pipes="true"
+flag_full_in_path_in_desc="false"
 
+flag_override_good_out_file=
+flag_override_good_err_file=
 
 
 C_RED=$(printf "\e[1;31m")
@@ -316,6 +320,16 @@ function print_help {
   printf "           Script path is path to the executed script/program.\n"
   printf "           There exists few built-in testing scripts:\n"
   printf "               Use '--tscript-err ignore' to always assume sterr output is OK.\n"
+  printf "        --tpipe-in <prog> - Run program input through additional middleware program.\n"
+  printf "            You can add more than one piping program.\n"
+  printf "            They are executed in order from left to the right.\n"
+  printf "            Each program has ability to use \$input and \$output variables.\n"
+  printf "            And should read input from \$input file and save it to \$output file.\n"
+  printf "            For example --tpipe-in 'cp \$input \$output' to do nothing important.\n"
+  printf "        --tpipe-out <prog> - Run program output through additional middleware program.\n"
+  printf "            See --tpipe-in.\n"
+  printf "        --tpipe-out-err <prog> - Run program std err output through additional middleware program.\n"
+  printf "            See --tpipe-in.\n"
   printf "        --tflags - enable --t* flags interpreting at any place among command line arguments (by default flags after dir are expected to be program flags)\n"
   printf "        --tsty-format - use !error!, !info! etc. output format\n"
   printf "        --tterm-format - use (default) term color formatting\n"
@@ -750,6 +764,16 @@ function test_err {
   fi
 }
 
+function evalspec {
+  code="${1/\%/\$}"
+  eval $code
+}
+
+function evalspecplain {
+  code="${1/\%/\$}"
+  eval echo $code
+}
+
 #
 # Usage: load_prop_variable <variable_prefix> <variable_name> <output_variable>
 #
@@ -761,7 +785,7 @@ function load_prop_variable {
   
   if [[ "${input_var_value}" != '' ]]; then
       return_buffer="${return_buffer}${output_var_name}=\"${output_var_value}\"\n"
-      printf "load_prop_variable ${output_var_name} -> ${input_var_value}\n"
+      #printf "load_prop_variable ${output_var_name} -> ${input_var_value}\n"
       eval $output_var_name=\$input_var_value
   fi
 }
@@ -774,20 +798,17 @@ function load_global_configuration_file {
     # Load global configuration file
     #
     
-    printf "LOAD GLOBAL CONFIURATION FILE ${global_configuration_file_path}\n"
+    #printf "LOAD GLOBAL CONFIURATION FILE ${global_configuration_file_path}\n"
     configuration_parsed_setup=$(parse_yaml "${global_configuration_file_path}" "global_config_" "false")
     
-    printf "GLOBAL_CONFIG:\n"
-    printf "$configuration_parsed_setup\n"
-    
-    eval $configuration_parsed_setup
+    evalspec "$configuration_parsed_setup"
    
     
     if [[ "$global_config_executions_" != "" ]]; then
       prog_arr_parser_acc=""
       for prog in "${global_config_executions_[@]}"
       do
-        printf "prog -> ${prog}\n"
+        #printf "prog -> ${prog}\n"
         if [[ "$prog_arr_parser_acc" = "" ]]; then
           prog_arr_parser_acc="\"${prog}\""
         else
@@ -812,13 +833,13 @@ function load_single_test_configuration_file {
     short_name=$(shortname "$param_prog")
     config_prefix="test_config_${short_name}__"
     
-    printf "LOAD CONFIURATION FILE ${single_test_configuration_file_path}\n"
+    #printf "LOAD CONFIURATION FILE ${single_test_configuration_file_path}\n"
     configuration_parsed_setup=$(parse_yaml "${single_test_configuration_file_path}" "test_config_" "false" | grep "$short_name")
     
-    printf "CONFIG:\n"
-    printf "$configuration_parsed_setup\n"
+    #printf "CONFIG:\n"
+    #printf "$configuration_parsed_setup\n"
     
-    eval $configuration_parsed_setup
+    evalspec "$configuration_parsed_setup"
     
     load_prop_variable "${config_prefix}" "args" "input_prog_flag_acc"
     load_prop_variable "${config_prefix}" "executable" "param_prog"
@@ -828,7 +849,7 @@ function load_single_test_configuration_file {
     #printf "elelele\n"
     #printf "$configuration_parsed_setupsss\n"
     
-    printf "Return buffer:\n${return_buffer}"
+    #printf "Return buffer:\n${return_buffer}"
   fi
 }
 
@@ -1171,7 +1192,7 @@ function run_program_pipe {
       #
       # Pipe file from $input -> to $output
       #
-      eval $pipe
+      evalspec "$pipe"
       
       # Copy result back from output to input
       # then remove output file
@@ -1204,9 +1225,9 @@ function run_program {
   
   # There are no pipes used so do not operate on files
   if [[ "$flag_no_pipes" = "true" ]]; then
-    r=$($param_prog $input_prog_flag_acc < "${input_file_path}" 1> "${out_path}" 2> $err_path)
+    r=$($param_prog $input_prog_flag_acc < "${input_file_path}" 1> "${out_path}" 2> "${err_path}")
   else
-    r=$($param_prog $input_prog_flag_acc < "${input_file_path}.piped" 1> "${out_path}.piped" 2> $err_path)
+    r=$($param_prog $input_prog_flag_acc < "${input_file_path}.piped" 1> "${out_path}.piped" 2> "${err_path}.piped")
   fi
   
   
@@ -1259,6 +1280,10 @@ function run_program {
   if [[ "$flag_no_pipes" != "true" ]]; then
     # Pipe output
     run_program_pipe "${out_path}.piped" "${out_path}" "${flag_pipe_output[@]}"
+    
+    # Pipe err output
+    run_program_pipe "${err_path}.piped" "${err_path}" "${flag_pipe_err_output[@]}"
+    
     
     # Remove unwanted piping files
     rm -f "${input_file_path}.piped"
@@ -1320,6 +1345,7 @@ do
       --ts) flag_skip_ok=true ;;
       --tn) flag_skip_summary=true ;;
       --ta) flag_always_continue=false ;;
+      --tpipe-out-err) shift; flag_no_pipes="false"; flag_pipe_err_output+=("$1") ;;
       --tpipe-out) shift; flag_no_pipes="false"; flag_pipe_output+=("$1") ;;
       --tpipe-in) shift; flag_no_pipes="false"; flag_pipe_input+=("$1") ;;
       --tm) flag_skip_ok=true; flag_minimal=true ;;
@@ -1430,11 +1456,6 @@ do
     else
       flag_additional_test_name_info=""
     fi
-    param_prog="$prog"
-    
-    
-    param_prog_eval=$(eval echo $param_prog)
-    param_prog="$param_prog_eval"
     
     #printf "Evaluated prog is -> $param_prog_eval\n"
     
@@ -1452,27 +1473,74 @@ do
         fi
       fi
     
+      param_prog="$prog"
     
       #TEST_RESULTS
       input_file=$(basename $input_file_path)
-      
       input_file_name=${input_file/.in/}
-      good_out_path=$flag_good_out_path/${input_file/.in/.out}
-      good_err_path=$flag_good_err_path/${input_file/.in/.err}
-      out_path=$flag_out_path/${input_file/.in/.out}
-      err_path=$flag_err_path/${input_file/.in/.err}
-      single_test_configuration_file_path=${input_file_path/.in/.config.yaml}
+      input_file_folder=$(dirname "$input_file_path")
       
       # If input file name does not contain .in extension
       if [[ "${input_file/.in/}" = "$input_file" ]]; then
         input_file_name=${input_file}
-        good_out_path=$flag_good_out_path/${input_file}.out
-        good_err_path=$flag_good_err_path/${input_file}.err
-        out_path=$flag_out_path/${input_file}.out
-        err_path=$flag_err_path/${input_file}.err
+      fi
+      
+      #
+      # Parse dynamic paths
+      #
+      flag_good_out_path_unparsed=$flag_good_out_path
+      flag_good_err_path_unparsed=$flag_good_err_path
+      flag_good_out_path=$(evalspecplain "$flag_good_out_path")
+      flag_good_err_path=$(evalspecplain "$flag_good_err_path")
+      
+      if [[ "$flag_good_out_path" != "$flag_good_out_path_unparsed" ]]; then
+        good_out_path="$flag_good_out_path"
+      else
+        flag_good_out_path=$flag_good_out_path_unparsed
+      fi
+      
+      if [[ "$flag_good_err_path" != "$flag_good_err_path_unparsed" ]]; then
+        good_err_path="$flag_good_err_path"
+      else
+        flag_good_err_path=$flag_good_err_path_unparsed
+      fi
+      
+      if [[ ! -f "$good_out_path" ]]; then
+        good_out_path=$flag_good_out_path/${input_file/.in/.out}
+      fi
+      if [[ ! -f "$good_err_path" ]]; then
+        good_err_path=$flag_good_err_path/${input_file/.in/.err}
+      fi
+      if [[ ! -f "$out_path" ]]; then
+        out_path=$flag_out_path/${input_file/.in/.out}
+      fi
+      if [[ ! -f "$err_path" ]]; then
+        err_path=$flag_err_path/${input_file/.in/.err}
+      fi
+      single_test_configuration_file_path=${input_file_path/.in/.config.yaml}
+      
+      
+      # If input file name does not contain .in extension
+      if [[ "${input_file/.in/}" = "$input_file" ]]; then
+        if [[ ! -f "$good_out_path" ]]; then
+          good_out_path=$flag_good_out_path/${input_file}.out
+        fi
+        if [[ ! -f "$good_err_path" ]]; then
+          good_err_path=$flag_good_err_path/${input_file}.err
+        fi
+        if [[ ! -f "$out_path" ]]; then
+          out_path=$flag_out_path/${input_file}.out
+        fi
+        if [[ ! -f "$err_path" ]]; then
+          err_path=$flag_err_path/${input_file}.err
+        fi
         single_test_configuration_file_path=${input_file_path}.config.yaml
       fi
       
+      
+      param_prog="$prog"
+      param_prog_eval=$(evalspecplain "$param_prog")
+      param_prog="$param_prog_eval"
       
       return_buffer=""
       load_single_test_configuration_file
@@ -1491,6 +1559,13 @@ do
         test_out
         print_tooling_additional_test_info
       fi
+      
+      #
+      # Move back to unparsed paths
+      #
+      flag_good_out_path=$flag_good_out_path_unparsed
+      flag_good_err_path=$flag_good_err_path_unparsed
+      
       if [[ "$want_to_skip_other_programs" = "true" ]]; then
         break
       fi
