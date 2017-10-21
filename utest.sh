@@ -107,21 +107,11 @@ function _spinner() {
     case $1 in
         start)
       if [[ -z ${3} ]]; then
-        #echo "spinner is not running.."
-        # calculate the column where spinner and status msg will be displayed
-        # let column=$(tput cols)-${#2}-8
         let column=1
-        # display message and position the cursor in $column column
-        #echo -ne ${2}
-        #printf "%${column}s"
-
-        
         # start spinner
         i=1
         sp='\|/-'
         delay=${SPINNER_DELAY:-0.15}
-
-        #echo -ne "  "
         printf "\n "
         while :
         do
@@ -129,29 +119,17 @@ function _spinner() {
           sleep $delay
         done
       else
-        #echo -e ""
         sleep 0
       fi
             ;;
         stop)
             if [[ -z ${3} ]]; then
-                #echo "spinner is not running.."
-                #exit 1
-                #echo -e ""
                 sleep 0
               else
                 kill -9 $3 > /dev/null 2>&1
                 while kill -0 $3 2>/dev/null; do sleep 0.005; done
                 sleep 0.005
                 printf "\b\b\b   \b\b\b"
-                # inform the user upon success or failure
-                #echo -ne "\b"
-                #if [[ $2 -eq 0 ]]; then
-                #  echo -en "${green}${on_success}${nc}"
-                #else
-                #  echo -en "${red}${on_fail}${nc}"
-                #fi
-                #echo -e ""
               fi
               ;;
         *)
@@ -163,7 +141,7 @@ function _spinner() {
 
 # Disable spinner
 spinner_is_running=false
-flag_use_spinner=false
+flag_use_spinner=true
 
 function start_spinner {
   if [[ "${flag_use_spinner}|${flag_no_builtin_outputs}" = "true|false" ]]; then
@@ -212,7 +190,7 @@ sbusy ""
 # Usage: type test.sh --help to get some info
 #
 #
-# @Piotr StyczyÅ„ski 2017
+# @Piotr Styczyñski 2017
 #
 
 
@@ -297,6 +275,12 @@ TEXT_OK="OK"
 function stdout {
   if [[ "$flag_no_builtin_outputs" = "false" ]]; then
     printf $@
+  fi
+}
+
+function stdoutplain {
+  if [[ "$flag_no_builtin_outputs" = "false" ]]; then
+    echo -en "$@"
   fi
 }
 
@@ -1310,7 +1294,7 @@ function push_test_message_next_program {
 
 function flush_test_messages {
   sready
-  stdout "${message_accumulator}"
+  stdoutplain "${message_accumulator}"
   message_accumulator=""
   message_last_file_head=""
   message_tooling_data_accumulator=""
@@ -1695,6 +1679,7 @@ function run_utest {
   sbusy
   print_summary
   run_hook "deinit"
+  sready
   clean_temp
 }
 
@@ -1791,3 +1776,4 @@ do
     shift
 done
 run_utest
+sready

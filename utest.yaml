@@ -1,13 +1,9 @@
 input: test/*.in
-silent: true
 good_output: test/%input_file_name.out
 need_error_files: false
 executions:
     - prog1
     - prog2
-hooks:
-    test_case_fail:
-        - @echo ERR %{input_file}
 prog1:
     command: ./test/totest.sh
     args: %input_file_name
