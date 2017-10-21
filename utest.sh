@@ -265,6 +265,20 @@ E_BOLD=
 B_OK=
 E_OK=
 
+
+bdebug="\${B_DEBUG}"
+edebug="\${E_DEBUG}"
+berr="\${B_ERR}"
+eerr="\${E_ERR}"
+binfo="\${B_INFO}"
+einfo="\${E_INFO}"
+bwarn="\${B_WARN}"
+ewarn="\${E_WARN}"
+bbold="\${B_BOLD}"
+ebold="\${E_BOLD}"
+bok="\${B_OK}"
+eok="\${E_OK}"
+
 TEXT_OK="OK"
 
 # TODO REMOVE
@@ -1206,6 +1220,8 @@ function run_hook {
         hook_command="${hook_command#?}"
         silent_mode="true"
       fi
+      
+      #echo -en "HOOK COMMAND IS ${hook_command}"
       
       hook_command_result=$(eval "${hook_command}")
       if [[ "${hook_command_result}" != "" ]]; then

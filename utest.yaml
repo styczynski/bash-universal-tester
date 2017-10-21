@@ -1,13 +1,11 @@
 input: test/*.in
+silent: true
 good_output: test/%input_file_name.out
 need_error_files: false
 executions:
-    - prog1
-    - prog2
-prog1:
-    command: ./test/totest.sh
-    args: %input_file_name
-    pipes_out:
-        - echo 15 > %output
-prog2:
+    - prog
+hooks:
+    test_case_start:
+        - @echo %{bwarn}Hello%{ewarn} %input_file %{bok} %ok_index %{eok}
+prog:
     command: echo 159

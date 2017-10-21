@@ -177,19 +177,60 @@ About minimalistic modes:
 In `<prog>`, `--tgerr <dir>`, `--tgout <dir>` and config files you can use special dynamic variables.
 These are the following: 
 
-| name                   | description                                                      |
-|------------------------|------------------------------------------------------------------|
-| **%input_file**        | Current input file name along with extension                     |
-| **%input_file_name**   | Current input file without .in or .out extension                 |
-| **%input_file_folder** | Directory of current input file                                  |
-| **%input_file_path**   | Full input path                                                  |
-| **%input_file_list**   | List of all input files (separated by space) that will be loaded |
-| **%file_count**        | Number of all input files that will be loaded                    |
+| name                     | description                                                      |
+|--------------------------|------------------------------------------------------------------|
+| **%input_file**          | Current input file name along with extension                     |
+| **%input_file_name**     | Current input file without .in or .out extension                 |
+| **%input_file_folder**   | Directory of current input file                                  |
+| **%input_file_path**     | Full input path                                                  |
+| **%input_file_list**     | List of all input files (separated by space) that will be loaded |
+| **%file_count**          | Number of all input files that will be loaded                    |
+| **%file_index**          | Number of the current input file starting from 1                 |
+| **%ok_index**            | Current number of test that succeeded                            |
+| **%warn_index**          | Current number of test that generated warnnings                  |
+| **%not_exists_index**    | Current number of test that had problems with non existing files |
+| **%param_prog**          | Currently tested command                                         |
+| **%input_prog_flag_acc** | Currently tested command's arguments                             |
 
 Example usage: 
 ```
 utest "echo %input_file" <folder>
 ```
+
+
+Moreover you can use formatting variables (that are set via formatting switches). 
+Please use them instead of hard-coded values, because it's easy and improves 
+customizability of your output.
+
+| formatting variable name | description                                    |
+|--------------------------|------------------------------------------------|
+|  **%bdebug**             | Begins <b>DEBUG</b> text section               |
+|  **%edebug**             | Ends <b>DEBUG</b> text section                 |
+|  **%berr**               | Begins <b>ERROR</b> text section               |
+|  **%eerr**               | Ends <b>ERROR</b> text section                 |
+|  **%binfo**              | Begins <b>INFORMATION</b> text section         |
+|  **%einfo**              | Ends <b>INFORMATION</b> text section           |
+|  **%bwarn**              | Begins <b>WARNNING</b> text section            |
+|  **%ewarn**              | Ends <b>WARNNING</b> text section              |
+|  **%bbold**              | Begins <b>NOTICE</b> text section              |
+|  **%ebold**              | Ends <b>NOTICE</b> text section                |
+|  **%bok**                | Begins <b>OK STATUS</b> text section           |
+|  **%eok**                | Ends <b>OK STATUS</b> text section             |
+
+Example usage: 
+```yaml
+
+input: ./test
+executions:
+    - prog
+hooks:
+    test_case_start:
+        - @echo %{bwarn}Hello%{ewarn} %input_file %{bok} %ok_index %{eok}
+prog:
+    command: echo Something
+    
+```
+
 
 ## Piping
 
