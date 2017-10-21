@@ -226,6 +226,7 @@ All config options are listed there:
 ```yaml
 
 input: test/*.in
+silent: false
 good_output: test/%input_file_name.out
 good_err: test/%input_file_name.err
 need_error_files: false
@@ -266,6 +267,80 @@ prog2:
 
 You must identify program by the command it calls. 
 
+### Hooks
+
+You can provide hooks commands for any of testing lifecycle state.
+
+All available hooks are: 
+
+* <b>init</b> - called when testing begins
+* <b>deinit</b> - called when testing ends
+* <b>test_case_start</b> - called when new test file is tested
+* <b>test_case_finish</b> - called when the test file was tested
+* <b>test_case_fail</b> - called when test fails
+* <b>test_case_fail_out</b> - called when test fails on std output (launched after <b>test_case_fail</b>)
+* <b>test_case_fail_err</b> - called when test fails on error output (launched after <b>test_case_fail</b>)
+* <b>test_case_fail_success</b> - called when test succeeded
+
+**Please note that:**
+You can add mutliple commands that are executed in order from up to the bottom. 
+If the command begins with `@` character then it's output is directly displayed. 
+If not then utest can change it to be more readable to the user! 
+
+```yaml
+
+input: test/*.in
+good_output: test/%input_file_name.out
+need_error_files: false
+executions:
+    - prog1
+    - prog2
+hooks:
+    init:
+        - @echo Testing
+        - @echo Prepare input...
+    deinit:
+        - @echo Goodbye
+    test_case_fail:
+        - @echo [%{input_file}]  Test case failed for %{param_prog}
+    test_case_success:
+        - @echo [%{input_file}]  Test case successed for %{param_prog}
+    test_case_fail_out:
+        - @echo [%{input_file}]  FAILED ON OUTPUT
+    test_case_fail_err:
+        - @echo [%{input_file}]  FAILED ON ERR
+        - @echo Whats a shame
+    test_case_start:
+        - @echo New test case jsut started %{input_file}
+    test_case_finish:
+        - @echo The test case was finished
+prog1:
+    command: ./test/totest.sh
+    args: %input_file_name
+    pipes_out:
+        - echo 15 > %output
+prog2:
+    command: echo 159
+
+```
+
+### Custom output format
+
+Using `--tsilent` flags allows only hooks to write output.
+So if you use `@` sign along with hooks (see **Hooks** section)
+you can make utest output any format of the output you want!
+
+Example of outputing `ERR <file>` only on errors.
+
+```yaml
+
+hooks:
+    test_case_fail:
+        - @echo ERR %{input_file}
+```
+
+Simple enough, right?
+
 [badge sts]: https://img.shields.io/badge/-styczynsky_digital_systems-blue.svg?style=flat-square&logoWidth=20&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAABYAAAAXCAYAAAAP6L%2BeAAAABmJLR0QA%2FwD%2FAP%2BgvaeTAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAB3RJTUUH4AgSEh0nVTTLngAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAAAm0lEQVQ4y2Pc%2Bkz2PwMNAAs2wVMzk4jSbJY%2BD6ccEwONACMsKIh1JSEgbXKeQdr4PO1cPPQMZiGkoC7bkCQD7%2Fx7znDn35AOClK9PEJSBbNYAJz999UGrOLocsM0KHB5EZ%2FXPxiVMDAwMDD8SP3DwJA6kFka5hJCQOBcDwMDAwPDm3%2FbGBj%2BbR8tNrFUTbiAB8tknHI7%2FuTilAMA9aAwA8miDpgAAAAASUVORK5CYII%3D
 
 [badge download]: https://img.shields.io/badge/-download_me!-green.svg?style=flat-square&logoWidth=10&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAABkAAAArCAYAAACNWyPFAAAABmJLR0QA%2FwD%2FAP%2BgvaeTAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAB3RJTUUH4AgTDjEFFOXcpQAAAM1JREFUWMPt2EsOgzAMBFDPJHD%2F80Jid1G1KpR8SqKu7C2QJzwWsoCZSWedb0Tvg5Q%2FlCOOOOKII4444ogjjvxW8bTjYtK57zNTSoCdNm5VBcmRhdua7SJpKaXhN2hmEmO0fd%2BnANXgl2WxbduGAVUFVbUY9rquPVARyDmDpJCktKBK66pACOE5Ia%2FhUlUhaTPm9xM4ZEJScs6YDXwFH0IYgq6Ay%2Bm6C5WAQyYXo9edUQ2oIr1Q5TPUh4iImJkAsMI1AO3O4u4fiV5AROQBGVB7Fu2akxMAAAAASUVORK5CYII%3D
@@ -276,4 +351,4 @@ You must identify program by the command it calls.
 
 [screenshot 1]: https://raw.githubusercontent.com/styczynski/bash-universal-tester/master/static/screenshots/screenshot1.png
 
-[link download latest]: https://github.com/styczynski/bash-universal-tester/archive/1.6.2.zip
+[link download latest]: https://github.com/styczynski/bash-universal-tester/archive/1.8.0.zip
