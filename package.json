@@ -1,0 +1,19 @@
+{
+  "name": "bash-universal-tester",
+  "version": "1.8.0",
+  "description": "Universal testing script for bash",
+  "keywords": "bash, testing, tester, utest, bash-test, testing, script",
+  "homepage": "https://github.com/styczynski/bash-universal-tester",
+  "license" : "MIT",
+  "author": {
+    "name" : "Piotr Styczyński",
+    "email" : "piotrsty1@gmail.com",
+    "url" : "http://styczynski.ml"
+  },
+  "bin": {
+    "utest": "./utest.sh"
+  },
+  "devDependencies": {
+    
+  }
+}

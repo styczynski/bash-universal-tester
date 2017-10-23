@@ -1,5 +1,6 @@
 [![Made by Styczynsky Digital Systems][badge sts]][link styczynski]
 
+**Superquick installation via** `npm install -g bash-universal-tester`
 
 # :white_check_mark: bash-universal-tester &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [![Download][badge download]][link download latest]
 Universal testing script for bash
@@ -30,11 +31,23 @@ This is stand-alone script.
 
 ## Installation
 
-* Download through provided link [![Download][badge download]][link download latest]
+* Install via `npm`:
+
+```bash
+
+npm install -g bash-universal-tester
+
+```
+
+* Download through provided link &nbsp;&nbsp;&nbsp;&nbsp; [![Download][badge download]][link download latest]
 
 * Alternatively on bash type: 
 
-`wget https://raw.githubusercontent.com/styczynski/bash-universal-tester/master/utest.sh && chmod u+x ./utest.sh && mv ./utest.sh utest && PATH=$PATH:$PWD`
+```bash
+
+wget https://raw.githubusercontent.com/styczynski/bash-universal-tester/master/utest.sh && chmod u+x ./utest.sh && mv ./utest.sh utest && PATH=$PATH:$PWD
+
+```
 
 ## Basic usage
 
