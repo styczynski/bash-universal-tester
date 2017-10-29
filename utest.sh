@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION="1.8.0"
+VERSION="1.9.0"
 IFS=$'\n'
 
 # Dependencies
@@ -421,8 +421,17 @@ function update_loc {
 
 function prepare_input {
 
-  
   regex='(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]'
+  if [[ ! "${param_prog}" = "" ]]; then
+    if [[ "${param_dir}" = "" ]]; then
+        if [[ $param_prog =~ $regex ]]
+        then
+            param_dir="$param_prog"
+            param_prog=""
+        fi
+    fi
+  fi
+  
   if [[ $param_dir =~ $regex ]]
   then 
     # Link is valid URL so try to download file
@@ -460,6 +469,15 @@ function prepare_input {
       stdout "${B_INFO}This may take a while...${E_INFO}\n"
       mkdir "$folder_loc"
       unzip -q "$param_dir" -d "$folder_loc"
+      unpackage_status=$?
+      if [[ ! "$unpackage_status" = "0" ]]; then
+        unrar "$param_dir" "$folder_loc" 
+        unpackage_status=$?
+      fi
+      if [[ ! "$unpackage_status" = "0" ]]; then
+        unp "$param_dir" "$folder_loc" 
+        unpackage_status=$?
+      fi
     fi
     
     update_loc "$folder_loc"
@@ -474,6 +492,17 @@ function prepare_input {
       update_loc "$folder_loc"
     fi
     
+  fi
+  
+  # Look for utest.yaml inside test directory
+  if [[ -f "${param_dir}/utest.yaml" ]]; then
+    if [[ -f "./utest.yaml" ]]; then
+       stdout "${B_DEBUG}Found utest.yaml inside tests folder. But yaml file is already present.${E_DEBUG}\n"
+    else
+       stdout "${B_DEBUG}Found utest.yaml inside tests folder. Copy it.${E_DEBUG}\n"
+       cp -n "${param_dir}/utest.yaml" "./utest.yaml"
+       load_global_configuration_file
+    fi
   fi
 }
 
