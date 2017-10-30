@@ -1,6 +1,6 @@
 {
   "name": "bash-universal-tester",
-  "version": "1.9.1",
+  "version": "1.9.2",
   "description": "Universal testing script for bash",
   "keywords": "bash, testing, tester, utest, bash-test, testing, script",
   "homepage": "https://github.com/styczynski/bash-universal-tester",
