@@ -233,6 +233,7 @@ flag_hook_test_case_fail_err=()
 flag_hook_test_case_fail_out=()
 flag_hook_test_case_fail=()
 flag_hook_test_case_success=()
+flag_hook_command_clear=()
 
 # Should be changed
 flag_no_pipes="false"
@@ -299,23 +300,27 @@ function stdoutplain {
 }
 
 function clean_temp_content {
+  # FIX CLEAN
   if [[ ${flag_out_temp} = 'true' ]]; then
     rm -f -r $flag_out_path/*
   fi
   if [[ ${flag_err_temp} = 'true' ]]; then
     rm -f -r $flag_err_path/*
   fi
+  echo -en ""
 }
 
 
 
 function clean_temp {
+  # FIX CLEAN
   if [[ ${flag_out_temp} = 'true' ]]; then
     rm -f -r $flag_out_path
   fi
   if [[ ${flag_err_temp} = 'true' ]]; then
     rm -f -r $flag_err_path
   fi
+  echo -en ""
 }
 
 function close {
@@ -418,20 +423,32 @@ function update_loc {
   param_dir="$filename"
 }
 
+function run_command_clear {
+  sready
+  stdout "${B_INFO}Clearing temp build directiories...${E_INFO}\n"
+  rm -f -r $flag_out_path/*
+  rm -f -r $flag_err_path/*
+  sbusy
+  run_hook "command_clear"
+}
+
 
 function prepare_input {
 
-  regex='(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]'
-  if [[ ! "${param_prog}" = "" ]]; then
-    if [[ "${param_dir}" = "" ]]; then
-        if [[ $param_prog =~ $regex ]]
-        then
-            param_dir="$param_prog"
-            param_prog=""
-        fi
-    fi
+  if [[ "${param_original_command}" = "clear" ]]; then
+    run_command_clear
+    close 0
   fi
-  
+
+  regex='(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]'
+  if [[ "${param_original_command}" = "" ]]; then
+      if [[ $param_original_command =~ $regex ]]
+      then
+          param_dir="$param_original_command"
+          param_prog=""
+      fi
+  fi
+
   if [[ $param_dir =~ $regex ]]
   then 
     # Link is valid URL so try to download file
@@ -643,8 +660,9 @@ function set_format {
 function clean_out_err_paths {
   mkdir -p $flag_out_path
   mkdir -p $flag_err_path
-  rm -f -r $flag_out_path/*
-  rm -f -r $flag_err_path/*
+  # FIX CLEAN
+  #rm -f -r $flag_out_path/*
+  #rm -f -r $flag_err_path/*
 }
 
 
@@ -800,6 +818,11 @@ function run_testing {
         
         flag_good_out_path=$(evalspecplain "$flag_good_out_path")
         flag_good_err_path=$(evalspecplain "$flag_good_err_path")
+        
+        out_path=$flag_out_path/${input_file}
+        err_path=$flag_out_path/${input_file}
+        out_path=$(evalspecplain "$out_path")
+        err_path=$(evalspecplain "$err_path")
         
         if [[ "$flag_good_out_path" != "$flag_good_out_path_unparsed" ]]; then
           good_out_path="$flag_good_out_path"
@@ -1114,6 +1137,7 @@ function load_global_configuration_file {
     load_prop_variable_arr "global_config_" "hooks__test_case_fail_out_" "flag_hook_test_case_fail_out"
     load_prop_variable_arr "global_config_" "hooks__test_case_fail_" "flag_hook_test_case_fail"
     load_prop_variable_arr "global_config_" "hooks__test_case_success_" "flag_hook_test_case_success"
+    load_prop_variable_arr "global_config_" "hooks__command_clear_" "flag_hook_command_clear"
     
     
     
@@ -1794,6 +1818,7 @@ do
           if [[ "$param_counter" == 0 ]]; then
             param_counter=1
             param_prog="$1"
+            param_original_command="$1"
           else
             if [[ "$param_counter" == 1 ]]; then
               param_counter=2
