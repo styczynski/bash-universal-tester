@@ -1,4 +1,7 @@
 [![Made by Styczynsky Digital Systems][badge sts]][link styczynski]
+[![Travis build status][badge travis]][link travis] 
+
+[![NPM](https://nodei.co/npm/bash-universal-tester.png?mini=true)](https://www.npmjs.com/package/bash-universal-tester) 
 
 **Superquick installation via** `npm install -g bash-universal-tester`
 
@@ -290,6 +293,7 @@ executions:
     - prog1
     - prog2
 prog1:
+    cwd: ./somefolder
     command: ./test/totest.sh
     args: %input_file_name
     pipes_out:
@@ -314,8 +318,9 @@ All options of config file for single test are listed below:
 ```yaml
 
 prog2:
+    cwd: ./somefolder
     args: %input_file_name some additional args
-    in: override_input_file.in
+    input: override_input_file.in
 
 ```
 
@@ -395,6 +400,10 @@ hooks:
 
 Simple enough, right?
 
+[badge travis]: https://travis-ci.org/styczynski/bash-universal-tester.svg?branch=master
+
+[link travis]: https://travis-ci.org/styczynski/bash-universal-tester
+
 [badge sts]: https://img.shields.io/badge/-styczynsky_digital_systems-blue.svg?style=flat-square&logoWidth=20&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAABYAAAAXCAYAAAAP6L%2BeAAAABmJLR0QA%2FwD%2FAP%2BgvaeTAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAB3RJTUUH4AgSEh0nVTTLngAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAAAm0lEQVQ4y2Pc%2Bkz2PwMNAAs2wVMzk4jSbJY%2BD6ccEwONACMsKIh1JSEgbXKeQdr4PO1cPPQMZiGkoC7bkCQD7%2Fx7znDn35AOClK9PEJSBbNYAJz999UGrOLocsM0KHB5EZ%2FXPxiVMDAwMDD8SP3DwJA6kFka5hJCQOBcDwMDAwPDm3%2FbGBj%2BbR8tNrFUTbiAB8tknHI7%2FuTilAMA9aAwA8miDpgAAAAASUVORK5CYII%3D
 
 [badge download]: https://img.shields.io/badge/-download_me!-green.svg?style=flat-square&logoWidth=10&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAABkAAAArCAYAAACNWyPFAAAABmJLR0QA%2FwD%2FAP%2BgvaeTAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAB3RJTUUH4AgTDjEFFOXcpQAAAM1JREFUWMPt2EsOgzAMBFDPJHD%2F80Jid1G1KpR8SqKu7C2QJzwWsoCZSWedb0Tvg5Q%2FlCOOOOKII4444ogjjvxW8bTjYtK57zNTSoCdNm5VBcmRhdua7SJpKaXhN2hmEmO0fd%2BnANXgl2WxbduGAVUFVbUY9rquPVARyDmDpJCktKBK66pACOE5Ia%2FhUlUhaTPm9xM4ZEJScs6YDXwFH0IYgq6Ay%2Bm6C5WAQyYXo9edUQ2oIr1Q5TPUh4iImJkAsMI1AO3O4u4fiV5AROQBGVB7Fu2akxMAAAAASUVORK5CYII%3D
@@ -405,4 +414,4 @@ Simple enough, right?
 
 [screenshot 1]: https://raw.githubusercontent.com/styczynski/bash-universal-tester/master/static/screenshots/screenshot1.png
 
-[link download latest]: https://github.com/styczynski/bash-universal-tester/archive/1.9.2.zip
+[link download latest]: https://github.com/styczynski/bash-universal-tester/archive/1.9.3.zip
