@@ -1,0 +1,3 @@
+self_test:
+    cwd: ./basic_usage_cli
+    command: ../../utest.sh --tc --tno-spinner \\\"echo 123\\\" files

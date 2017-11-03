@@ -805,13 +805,13 @@ function run_testing {
         if [[ "$flag_good_out_path" != "$flag_good_out_path_unparsed" ]]; then
           good_out_path="$flag_good_out_path"
         else
-          flag_good_out_path=$flag_good_out_path_unparsed
+          good_out_path=$flag_good_out_path_unparsed
         fi
         
         if [[ "$flag_good_err_path" != "$flag_good_err_path_unparsed" ]]; then
           good_err_path="$flag_good_err_path"
         else
-          flag_good_err_path=$flag_good_err_path_unparsed
+          good_err_path=$flag_good_err_path_unparsed
         fi
         
         if [[ ! -f "$good_out_path" ]]; then
