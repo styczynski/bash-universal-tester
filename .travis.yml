@@ -1,0 +1,5 @@
+language: generic
+install:
+    - npm install
+script:
+    - chmod u+x ./utest.sh && cd self_test && bash ../utest.sh

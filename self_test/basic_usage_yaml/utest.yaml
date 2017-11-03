@@ -1,0 +1,6 @@
+input: files/*.in
+good_output: %input_file_folder/%input_file_name.out
+executions:
+    - prog0
+prog0:
+    command: cat %input_file_path
