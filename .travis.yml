@@ -2,4 +2,4 @@ language: generic
 install:
     - npm install
 script:
-    - cp ./utest.sh ./self_test/utest.sh && cd self_test && bash ../utest.sh
+    - cp ./utest.sh ./self_test/utest.sh && chmod u+x ./utest.sh && chmod u+x ./self_test/utest.sh && cd self_test && bash ../utest.sh
