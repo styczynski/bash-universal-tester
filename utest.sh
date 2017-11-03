@@ -1020,6 +1020,10 @@ function test_err {
   fi
 }
 
+function safename {
+  echo "$1" | tr -cd '[[:alnum:]]._-'
+}
+
 function evalspec {
   code="${1/\%/\$}"
   eval $code
@@ -1037,6 +1041,8 @@ function evalspecplain {
 function load_prop_variable {
   input_var_name="${1}${2}"
   output_var_name="${3}"
+  output_var_name=$(safename "${output_var_name}")
+  input_var_name=$(safename "${input_var_name}")
   input_var_value_raw="${!input_var_name}"
   input_var_value="$input_var_value_raw"
   if [[ "$4" != "false" ]]; then
@@ -1066,8 +1072,12 @@ function load_prop_value {
 function load_prop_variable_arr {
   input_var_name="${1}${2}[@]"
   output_var_name="${3}"
+  input_var_name=$(safename "${input_var_name}")
+  output_var_name=$(safename "${output_var_name}")
   
   #input_var_value=$(eval echo "\"\${${input_var_name}[@]}\"")
+  input_var_value=$(safename "${input_var_value}")
+  output_var_value=$(safename "${output_var_value}")
   input_var_value=( ${!input_var_name} )
   output_var_value=( ${!output_var_name} )
   
@@ -1236,6 +1246,7 @@ function unload_single_test_configuration_file {
 function run_hook {
   sbusy
   hook_name="flag_hook_${1}[@]"
+  hook_name=$(safename "${hook_name}")
   hook_value=( ${!hook_name} )
   
   hook_result=""
