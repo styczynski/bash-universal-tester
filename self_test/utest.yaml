@@ -4,4 +4,4 @@ executions:
     - self_test
 self_test:
     cwd: ./basic_usage
-    command: ../../utest.sh --tc --tno-spinner
+    command: ../utest.sh --tc --tno-spinner
