@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION="1.9.2"
+VERSION="1.9.3"
 IFS=$'\n'
 
 # Dependencies
@@ -224,6 +224,7 @@ flag_additional_test_name_info=
 flag_pipe_input=()
 flag_pipe_output=()
 flag_pipe_err_output=()
+param_cwd=""
 
 flag_hook_init=()
 flag_hook_deinit=()
@@ -1026,7 +1027,8 @@ function evalspec {
 
 function evalspecplain {
   code="${1//\%/\$}"
-  eval echo $code
+  code=$(eval echo "$code")
+  echo "$code"
 }
 
 #
@@ -1154,6 +1156,7 @@ function load_single_test_configuration_file {
   
   # Load global config
   load_prop_variable "${global_config_prefix}" "command" "param_prog"
+  load_prop_variable "${global_config_prefix}" "cwd" "param_cwd"
   load_prop_variable "${global_config_prefix}" "args" "input_prog_flag_acc"
   load_prop_variable "${global_config_prefix}" "input" "input_file_path"
   
@@ -1187,7 +1190,7 @@ function load_single_test_configuration_file {
     # Sotre call name of prog
     load_prop_variable "" "param_prog" "param_prog_call_name" "false"
     load_prop_variable "${config_prefix}" "command" "param_prog"
-    
+    load_prop_variable "${config_prefix}" "cwd" "param_cwd"
     
     load_prop_variable "${config_prefix}" "input" "input_file_path"
     
@@ -1636,16 +1639,27 @@ function run_program {
     tool_time_data_stime_start=`date +%s%3N`
   fi
 
-  # There are no pipes used so do not operate on files
-  if [[ "$flag_no_pipes" = "true" ]]; then
-    r=$(eval $param_prog $input_prog_flag_acc < "${input_file_path}" 1> "${out_path}" 2> "${err_path}")
+  if [[ ! "$param_cwd" = "" ]]; then
+    eval_call="( cd $param_cwd ; ${param_prog} ${input_prog_flag_acc} )"
+    
+    # There are no pipes used so do not operate on files
+    if [[ "$flag_no_pipes" = "true" ]]; then
+      eval $eval_call < "${input_file_path}" 1> "${out_path}" 2> "${err_path}"
+    else
+      eval $eval_call < "${input_file_path}.piped" 1> "${out_path}.piped" 2> "${err_path}.piped"
+    fi
+  
   else
-    r=$(eval $param_prog $input_prog_flag_acc < "${input_file_path}.piped" 1> "${out_path}.piped" 2> "${err_path}.piped")
-  fi
-  
-  
-  
-  
+    
+    # There are no pipes used so do not operate on files
+    if [[ "$flag_no_pipes" = "true" ]]; then
+      r=$(eval $param_prog $input_prog_flag_acc < "${input_file_path}" 1> "${out_path}" 2> "${err_path}")
+    else
+      r=$(eval $param_prog $input_prog_flag_acc < "${input_file_path}.piped" 1> "${out_path}.piped" 2> "${err_path}.piped")
+    fi
+    
+  fi  
+
   if [[ $flag_tools_use_stime = 'true' ]]; then
     tool_time_data_stime_end=`date +%s%3N`
     push_test_message_tooling_info "$((tool_time_data_stime_end-tool_time_data_stime_start))ms"
@@ -1702,7 +1716,6 @@ function run_program {
     rm -f "${input_file_path}.piped"
     rm -f "${out_path}.piped"
   fi
-
 
 }
 
@@ -1822,3 +1835,9 @@ do
 done
 run_utest
 sready
+if [[ "$err_index" != "0" ]]; then
+   close 1
+fi
+
+close 0
+

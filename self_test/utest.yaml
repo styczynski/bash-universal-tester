@@ -1,0 +1,7 @@
+input: ./**/*.test
+good_output: %{input_file_folder}/test.out
+executions:
+    - self_test
+self_test:
+    cwd: ./basic_usage
+    command: ../../utest.sh --tc --tno-spinner
