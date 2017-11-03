@@ -414,4 +414,4 @@ Simple enough, right?
 
 [screenshot 1]: https://raw.githubusercontent.com/styczynski/bash-universal-tester/master/static/screenshots/screenshot1.png
 
-[link download latest]: https://github.com/styczynski/bash-universal-tester/archive/1.9.3.zip
+[link download latest]: https://github.com/styczynski/bash-universal-tester/archive/1.9.4.zip
