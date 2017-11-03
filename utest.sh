@@ -1021,7 +1021,7 @@ function test_err {
 }
 
 function safename {
-  echo "$1" | tr -cd '[[:alnum:]]._-'
+  echo "$1" | tr -cd '[[:alnum:]].@_-'
 }
 
 function evalspec {
