@@ -1492,7 +1492,7 @@ function push_test_message_next_program {
 
 function flush_test_messages {
   sready
-  stdoutplain "${message_accumulator}"
+  stdoutplain "${message_accumulator}      "
   message_accumulator=""
   message_last_file_head=""
   message_tooling_data_accumulator=""
