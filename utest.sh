@@ -4,7 +4,7 @@ VERSION="1.9.4"
 IFS=$'\n'
 
 log_container="    [[ UTEST version ${VERSION} ]]    \n\n"
-flag_log=true
+flag_log=false
 function log {
   if [[ "$flag_log" = "true" ]]; then
     time=$(date "+%H:%M:%S")
@@ -368,6 +368,7 @@ function print_help {
   printf "      [prog_flags] are optional conmmand line argument passed to program <prog>\n"
   printf "      [test_flags] are optional flags for test script\n"
   printf "      All available [test_flags] are:\n"
+  printf "        --tlog - Enable logging to the utest.log file.\n"
   printf "        --tsilent - Outputs nothing except for the hooks messages.\n"
   printf "        --ttools <tools> - set additional debug tools\n"
   printf "           Tools is the coma-separated array of tools names. Tools names can be as the following:\n"
@@ -1958,6 +1959,7 @@ do
         unset IFS
         IFS=$'\n'
       } ;;
+      --tlog) flag_log=true ;;
       --tscript) shift; flag_test_out_script="$1" ;;
       --tscript-err) shift; flag_test_err_script="$1" ;;
       --tierr) flag_always_ignore_stderr=true ;;
