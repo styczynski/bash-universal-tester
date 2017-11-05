@@ -1,0 +1,27 @@
+
+[14:05:48] Started utest main body :)
+[14:05:48] Set output format to { term }.
+[14:05:48] Load global configuration file ""
+[14:05:48] Global configuration file not found :(
+[14:05:48] Prepare input files...
+[14:05:48] Look for utest.yaml inside test directory...
+[14:05:48] Did not found utest.yaml in the test folder ("/utest.yaml")
+[14:05:48] Veryfying provided parameters
+[14:05:48] Param prog is empty trigger AUTODETECTION.
+[14:05:49] Run executable autodetection...
+[14:05:49] Possible executables are:
+  ./utest.sh
+./.git/hooks/applypatch-msg.sample
+./.git/hooks/commit-msg.sample
+[14:05:49] Print possible executables to the output.
+[14:05:49] Clean temp files...
+[14:05:49] Clean temp out:
+  rm -f -r ./test_out_temp
+[14:05:49] Clean temp err:
+  rm -f -r ./test_out_temp
+[14:05:50] Cleanup done.
+[14:05:50] Run hook deinit
+[14:05:50] No hook listeners found! :(
+[14:05:50] Finished executing hook.
+[14:05:50] Close (status=1)
+[14:05:50] Flush log to the file.

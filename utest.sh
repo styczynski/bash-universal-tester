@@ -3,17 +3,17 @@
 VERSION="1.9.4"
 IFS=$'\n'
 
-log_container=""
-flag_log=false
+log_container="    [[ UTEST version ${VERSION} ]]    \n\n"
+flag_log=true
 function log {
-  if [[ "$flag_log" = "true" ]];
+  if [[ "$flag_log" = "true" ]]; then
     time=$(date "+%H:%M:%S")
     message="[${time}] ${1}"
     log_container="${log_container}\n${message}"
   fi
 }
 function flushlog {
-  if [[ "$flag_log" = "true" ]];
+  if [[ "$flag_log" = "true" ]]; then
     log "Flush log to the file."
     printf "$log_container" > utest.log
   fi
