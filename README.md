@@ -147,6 +147,8 @@ You can read more about dynamic variables in *variables* section.
 	  
 |          Switch                   | Parameters | Description  |
 |-----------------------------------|------------|--------------|
+| **--tdebug**                      |            | Disables removing any files (so the utest probably won't do any harm) and enables --tlog flag. |
+| **--tlog**                        |            | Enable logging into utest.log file in the current directory. |
 | **--ttools**                      | *[tools]*  | Sets additional debug tools.<br>`[tools]` is the coma-separated array of tools names.<br>Tools names can be as the following:<br><ul><li><b>size</b> - prints the size of input file in bytes.</li><li><b>time</b> - prints time statistic using Unix time command.</li><li><b>stime</b> - measures time using bash date command (not as precise as time tool).</li><li><b>vmemcheck</b> - uses valgrind memcheck tools to search for application leaks.</li><li><b>vmassif</b> - uses valgrind massif and prints peak memory usage.</li></ul> |
 | **--tscript**                     | *[script]* | Sets output testing command as `[script]`<br>Script path is path to the executed script/program.<br>There exists few built-in testing scripts:<br><ul><li>Use <b>--tscript ignore</b> to always assume output is OK.</li> |
 | **--tscript-err**                 | *[script]* | Sets stderr output testing command as `[script]`<br>Script path is path to the executed script/program.<br>There exists few built-in testing scripts:<br><ul><li>Use <b>--tscript-err ignore</b> to always assume stderr is OK.</li> |
@@ -414,4 +416,4 @@ Simple enough, right?
 
 [screenshot 1]: https://raw.githubusercontent.com/styczynski/bash-universal-tester/master/static/screenshots/screenshot1.png
 
-[link download latest]: https://github.com/styczynski/bash-universal-tester/archive/1.9.4.zip
+[link download latest]: https://github.com/styczynski/bash-universal-tester/archive/1.9.5.zip

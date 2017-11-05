@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION="1.9.4"
+VERSION="1.9.5"
 IFS=$'\n'
 
 log_container="    [[ UTEST version ${VERSION} ]]    \n\n"
