@@ -1,7 +1,27 @@
 #!/usr/bin/env bash
 
-VERSION="1.9.4"
+VERSION="1.9.5"
 IFS=$'\n'
+
+log_container="    [[ UTEST version ${VERSION} ]]    \n\n"
+flag_log=false
+flag_never_rm=false
+
+function log {
+  if [[ "$flag_log" = "true" ]]; then
+    time=$(date "+%H:%M:%S")
+    message="[${time}] ${1}"
+    log_container="${log_container}\n${message}"
+  fi
+}
+
+function flushlog {
+  if [[ "$flag_log" = "true" ]]; then
+    log "Flush log to the file."
+    printf "$log_container" > utest.log
+  fi
+}
+
 
 # Dependencies
 
@@ -21,6 +41,7 @@ IFS=$'\n'
 #   [optional string "true" -> use IFS=|next|]
 #
 parse_yaml() {
+    log "Load YAML file \"${1}\""
     #unset IFS
     IFS=$'\n'
     local prefix=$2
@@ -63,6 +84,7 @@ function shortname {
   short_name=$(basename "$1" | tr . _)
   printf "$short_name"
 } 
+
 
 #
 #
@@ -129,7 +151,7 @@ function _spinner() {
                 kill -9 $3 > /dev/null 2>&1
                 while kill -0 $3 2>/dev/null; do sleep 0.005; done
                 sleep 0.005
-                printf "\b\b\b   \b\b\b"
+                printf "\b\b\b   \b\b\b  "
               fi
               ;;
         *)
@@ -300,28 +322,66 @@ function stdoutplain {
 }
 
 function clean_temp_content {
-  if [[ ${flag_out_temp} = 'true' ]]; then
-    rm -f -r $flag_out_path/*
+  log "Clean temp content..."
+  if [[ "$flag_never_rm" = "false" ]]; then
+    if [[ ${flag_out_temp} = 'true' ]]; then
+      log "Clean temp out:\n  rm -f -r $flag_out_path/*"
+      if [[ ! "$flag_out_path" = "" ]]; then
+        rm -f -r $flag_out_path/*.piped
+        rm -f -r $flag_out_path/*.out
+        rm -f -r $flag_out_path/*.err
+      else
+        log "ERROR Try to remove empty flag out path recursively! :(("
+      fi
+    fi
+    if [[ ${flag_err_temp} = 'true' ]]; then
+      log "Clean temp err:\n  rm -f -r $flag_err_path/*"
+      if [[ ! "$flag_err_path" = "" ]]; then
+        rm -f -r $flag_err_path/*.piped
+        rm -f -r $flag_err_path/*.out
+        rm -f -r $flag_err_path/*.err
+      else
+        log "ERROR Try to remove empty flag err path recursively! :(("
+      fi
+    fi
+  else
+    log "Cleanup blocked (never rm flag is set)"
   fi
-  if [[ ${flag_err_temp} = 'true' ]]; then
-    rm -f -r $flag_err_path/*
-  fi
+  log "Cleanup done."
 }
 
 
 
 function clean_temp {
-  if [[ ${flag_out_temp} = 'true' ]]; then
-    rm -f -r $flag_out_path
+  log "Clean temp files..."
+  if [[ "$flag_never_rm" = "false" ]]; then
+    if [[ ${flag_out_temp} = 'true' ]]; then
+      log "Clean temp out:\n  rm -f -r $flag_out_path"
+      if [[ ! "$flag_out_path" = "" ]]; then
+        if [[ ! "$flag_out_path" = "/" ]]; then
+          rm -f -r $flag_out_path
+        fi
+      fi
+    fi
+    if [[ ${flag_err_temp} = 'true' ]]; then
+      log "Clean temp err:\n  rm -f -r $flag_err_path"
+      if [[ ! "$flag_err_path" = "" ]]; then
+        if [[ ! "$flag_out_path" = "/" ]]; then
+          rm -f -r $flag_err_path
+        fi
+      fi
+    fi
+  else
+    log "Cleanup blocked (never rm flag is set)"
   fi
-  if [[ ${flag_err_temp} = 'true' ]]; then
-    rm -f -r $flag_err_path
-  fi
+  log "Cleanup done."
 }
 
 function close {
   run_hook "deinit"
   sready $1
+  log "Close (status=${1})"
+  flushlog
   exit $1
 }
 
@@ -329,6 +389,7 @@ function close {
 
 function print_help {
   sready
+  log "Display help."
   echo -e "--- utest.sh VERSION ${VERSION}v ---\n\n"
   printf "General purpose awesome testing-script v. $VERSION\n\n"
   printf "Usage:\n"
@@ -338,6 +399,10 @@ function print_help {
   printf "      [prog_flags] are optional conmmand line argument passed to program <prog>\n"
   printf "      [test_flags] are optional flags for test script\n"
   printf "      All available [test_flags] are:\n"
+  printf "        --tdebug - Turns debug mode ON.\n"
+  printf "            In debug mode no files are ever deleted!\n"
+  printf "            Also logging with --tlog is enabled.\n"
+  printf "        --tlog - Enable logging to the utest.log file.\n"
   printf "        --tsilent - Outputs nothing except for the hooks messages.\n"
   printf "        --ttools <tools> - set additional debug tools\n"
   printf "           Tools is the coma-separated array of tools names. Tools names can be as the following:\n"
@@ -417,10 +482,15 @@ function update_loc {
   #printf "  NOW OK\n\n"
   
   param_dir="$filename"
+  
+  log "Update locations.\n  Good error path points to \"${flag_good_err_path}\"\n  Good output path points to \"${flag_good_out_path}\"\n  Param directory points to \"${param_dir}\""
+  
 }
 
 
 function prepare_input {
+
+  log "Prepare input files..."
 
   regex='(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]'
   if [[ ! "${param_prog}" = "" ]]; then
@@ -429,32 +499,38 @@ function prepare_input {
         then
             param_dir="$param_prog"
             param_prog=""
+            log "URL detected.\n  Set param directory to point to \"${param_dir}\"."
         fi
     fi
   fi
   
   if [[ $param_dir =~ $regex ]]
-  then 
+  then
+    log "Try to download file from \"${param_dir}\"..."
     # Link is valid URL so try to download file
     sready
     stdout "${B_INFO}Trying to download data from provided url...${E_INFO}\n"
     filename=$(curl -sI  $param_dir | grep -o -E 'filename=.*$' | sed -e 's/filename=//')
     if [[ "$filename" = "" ]]; then
+      log "Cannot obtain file name. Use default generated."
       filename="downloaded_tests.zip"
     fi
     if [[ -f $filename ]]; then
       sready
+      log "Downloaded file is present. Skip download."
       stdout "${B_INFO}File already present. Skipping.${E_INFO}\n"
       update_loc "$filename"
     else
       sready
       stdout "${B_INFO}Download into \"${filename}\"${E_INFO}\n"
+      log "Download URL into path \"${filename}\"."
       curl -f -L -o "$filename" $param_dir
       curl_status=$?
       if [ "$curl_status" -eq 0 ]; then
         update_loc "$filename"
       else
         sready
+        log "Failed to download the requested file.\n  Curl exit status is ${curl_status}"
         stdout "${B_ERR}Could not download requested file. :(${E_ERR}\n"
         close 22
       fi
@@ -462,20 +538,24 @@ function prepare_input {
   fi
 
   if [[ -f $param_dir ]]; then
+    log "Detected param directory is a file."
     folder_loc=${param_dir%%.*}
   
     if [[ ! -d "$folder_loc" ]]; then
       sready
+      log "Try to unzip file \"${folder_loc}\"."
       stdout "${B_INFO}Test input is zip file -- needs unzipping...${E_INFO}\n"
       stdout "${B_INFO}This may take a while...${E_INFO}\n"
       mkdir "$folder_loc"
       unzip -q "$param_dir" -d "$folder_loc"
       unpackage_status=$?
       if [[ ! "$unpackage_status" = "0" ]]; then
+        log "Try to unrar file \"${folder_loc}\"."
         unrar "$param_dir" "$folder_loc" 
         unpackage_status=$?
       fi
       if [[ ! "$unpackage_status" = "0" ]]; then
+        log "Try to unpack file (using unp) \"${folder_loc}\"."
         unp "$param_dir" "$folder_loc" 
         unpackage_status=$?
       fi
@@ -486,6 +566,7 @@ function prepare_input {
     # USE AUTOFIND
     best_test_dir=$(autofind_tests "$folder_loc")
     if [[ ${best_test_dir} != '' ]]; then
+      log "Autodected ${best_test_dir} as best testing directory.\n  Using it. :)"
       sready
       stdout "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
       update_loc "$best_test_dir"  
@@ -496,25 +577,33 @@ function prepare_input {
   fi
   
   # Look for utest.yaml inside test directory
+  log "Look for utest.yaml inside test directory..."
   if [[ -f "${param_dir}/utest.yaml" ]]; then
     if [[ -f "./utest.yaml" ]]; then
+       log "Found utest.yaml but it's already present in cwd so skipping!"
        stdout "${B_DEBUG}Found utest.yaml inside tests folder. But yaml file is already present.${E_DEBUG}\n"
     else
+       log "Found utest.yaml so copy it :)"
        stdout "${B_DEBUG}Found utest.yaml inside tests folder. Copy it.${E_DEBUG}\n"
        cp -n "${param_dir}/utest.yaml" "./utest.yaml"
        load_global_configuration_file
     fi
+  else
+    log "Did not found utest.yaml in the test folder (\"${param_dir}/utest.yaml\")"
   fi
 }
 
 function autofind_tests {
   # USE AUTOFIND
-  best_test_dir=$(find "$1" -maxdepth 3 -type f -name "**.in" -printf '%h\n' | sort | uniq -c | sort -k 1 -r | awk  '{print $2}' | head -n 1)
-  sready
+  log "Try to use autofind functionality..."
+  best_test_dir=$(find "$1" -maxdepth 3 -type f -name "**.in" -printf '%h\n' | sort | uniq -c | sort -k 1 -r | awk  '{print $2}' | head -n 1 | tr -d "[:cntrl:]")
+  log "Autofind selected:\n  ${best_test_dir}"
   printf "$best_test_dir"
 }
 
 function verify_args {
+ 
+  log "Veryfying provided parameters"
  
   if [[ ${flag_force} = 'false' ]]; then
 
@@ -522,22 +611,30 @@ function verify_args {
     prog_autodetect_rel_path=.
 
     if [[ $param_prog = '' ]]; then
+      log "Param prog is empty trigger AUTODETECTION."
       prog_use_autodetect=true
     fi
 
     if [[ -d $param_prog ]]; then
+      log "Param prog is directory trigger AUTODETECTION with hint \"${param_prog}\"."
       prog_use_autodetect=true
       prog_autodetect_rel_path="$param_prog"
     fi
 
     if [[ $prog_use_autodetect = 'true' ]]; then
 
+      log "Run executable autodetection..."
+    
       possible_executables=$(find "$prog_autodetect_rel_path" -perm /u=x,g=x,o=x -type f -printf "%d %p\n" | sort -n| head -n 3 | awk '{print $2}')
+      
+      log "Possible executables are:\n  ${possible_executables}"
+      
       #possible_executables=$(while read -r line; do
       #  stat -c '%Y %n' "$line"
       #done <<< "$possible_executables" | sort -n | cut -d ' ' -f2)
 
       if [[ $param_prog = '' ]]; then
+        log "Print possible executables to the output."
         sready
         stdout "${B_ERR}Tested program name was not given. (parameter <prog> is missing)${E_ERR}\n"
         stdout "${B_DEBUG}Possible executables to test:\n\n$possible_executables"
@@ -546,15 +643,20 @@ function verify_args {
         clean_temp
         close 1
       else
+        log "Automatically proceed to testing autodetected programs..."
         param_prog=$(echo "$possible_executables" | head -n 1)
+        log "Automatically using program \"${param_prog}\"..."
         sready
         stdout "${B_DEBUG}Autodected \'$param_prog\' as best test program. Using it.${E_DEBUG}\n"
       fi
     fi
     if [[ $param_dir = '' ]]; then
       # USE AUTOFIND
+      log "Param directory was not given so use AUTODETECTION."
       best_test_dir=$(autofind_tests ".")
+      log "Best testing directory was determined to be \"${best_test_dir}\"."
       if [[ ${best_test_dir} = '' ]]; then
+        log "AUTODETECTION returned nothing so exit."
         sready
         stdout "${B_ERR}Input directory was not given. (parameter <input_dir> is missing)${E_ERR}\n"
         stdout "${B_ERR}Usage: test <prog> <input_dir> [flags]${E_ERR}\n"
@@ -562,6 +664,7 @@ function verify_args {
         clean_temp
         close 1
       else
+        log "AUTODETECTION returned some result so proceed."
         sready
         #printf "${B_WARN}Input directory was not given. (parameter <input_dir> is missing)${E_WARN}\n"
         stdout "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
@@ -569,6 +672,8 @@ function verify_args {
         if [[ "$flag_good_out_path" = "" ]]; then
           flag_good_out_path="$param_dir"
         fi
+        
+        log "Setup autodetected paths.\n  Now param directory points to \"${param_dir}\".\n  And good output path points to \"${flag_good_out_path}\""
       fi
       #sready
       #printf "${B_ERR}Input directory was not given. (parameter <input_dir> is missing)${E_ERR}\n"
@@ -580,16 +685,24 @@ function verify_args {
     if [[ -d $param_dir ]]; then
       echo -en ""
     else
+      log "Param directory is not a directory! :("
       sready
       
+      log "Interpret directory as regex"
       regex_file_list=$(find -regextype posix-extended -regex "${param_dir}" -print0)  
       if [[ "$regex_file_list" != "" ]]; then
         echo -en ""
+        log "Regex returned results :)"
       else
+        log "Regex failed to return anything"
+        log "Interpret directory as globbing pattern"
         regex_file_list=$(ls -v $param_dir 2> /dev/null)  
         if [[ "$regex_file_list" != "" ]]; then
           echo -en ""
+          log "Globbing returned results :)"
         else
+          log "Globbing failed."
+          log "No more directory interpretations. FAIL"
           stdout "${B_ERR}Input directory \"$param_dir\" does not exists.${E_ERR}\n"
           stdout "${B_DEBUG}Use -f option to forcefully proceed.${E_DEBUG}\n"
           clean_temp
@@ -600,6 +713,7 @@ function verify_args {
     fi
   fi
   if [[ ${flag_always_need_good_err} = 'true' ]]; then
+    log "Need good error is set to true so inherit good err path from param directory."
     if [[ ${flag_good_err_path} = '' ]]; then
       flag_good_err_path=$param_dir
     fi
@@ -609,6 +723,7 @@ function verify_args {
 
 
 function set_format {
+  log "Set output format to { ${flag_formating} }."
   if [[ ${flag_formating} = 'sty' ]]; then
     B_DEBUG="!debug!"
     E_DEBUG="!normal!"
@@ -642,14 +757,24 @@ function set_format {
 
 
 function clean_out_err_paths {
+  log "Clean output error paths."
+  log "   mkdir $flag_out_path"
+  log "   mkdir $flag_err_path"
+  log "   rm -f -r $flag_out_path/*"
+  log "   rm -f -r $flag_err_path/*"
   mkdir -p $flag_out_path
   mkdir -p $flag_err_path
-  rm -f -r $flag_out_path/*
-  rm -f -r $flag_err_path/*
+  if [[ "$flag_never_rm" = "false" ]]; then
+    rm -f -r $flag_out_path/*
+    rm -f -r $flag_err_path/*
+  else
+    log "Removal blocked (flag never rm is set up)."
+  fi
 }
 
 
 function collect_testing_programs {
+  log "Collecting testing programs..."
   testing_programs_list_str="$param_prog"
   IFS=','
   flag_testing_programs_len=0
@@ -657,26 +782,35 @@ function collect_testing_programs {
   do
     param_prog="$testing_prog"
     find_testing_program
+    log "Collected \"${testing_prog}\" as \"${param_prog}\""
     flag_testing_programs[${flag_testing_programs_len}]=$param_prog
     flag_testing_programs_len=$((flag_testing_programs_len+1))
   done
   unset IFS
   IFS=$'\n'
+  log "Collected all programs."
   param_prog="$testing_programs_list_str"
 }
 
 
 function find_testing_program {
+  log "Find testing program with hint \"${param_prog}\"..."
   command -v "$param_prog" >/dev/null 2>&1
   if [ "$?" != "0" ]; then
+    log "Program is not a valid command"
     command -v "./$param_prog" >/dev/null 2>&1
     if [ "$?" != "0" ]; then
+      log "Program is not a valid \"./NAME\" style command"
       command -v "./$param_prog.exe" >/dev/null 2>&1
       if [ "$?" != "0" ]; then
+        log "Program is not a valid \"./NAME.exe\" style command"
         command -v "./$param_prog.app" >/dev/null 2>&1
         if [ "$?" != "0" ]; then
+          log "Program is not a valid \"./NAME.app\" style command"
           command -v "./$param_prog.sh" >/dev/null 2>&1
           if [ "$?" != "0" ]; then
+            log "Program is not a valid \"./NAME.sh\" style command"
+            log "No more options end testing and override no settings. :("
             #sready
             #printf "${B_ERR}Invalid program name: ${param_prog}. Program not found.${E_ERR}\n";
             #printf "${B_ERR}Please verify if the executable name is correct.${E_ERR}"
@@ -701,6 +835,7 @@ function find_testing_program {
 
 
 function count_input_files {
+  log "Try to count input files..."
   # Count input files
   unset IFS
   file_count=0
@@ -708,16 +843,19 @@ function count_input_files {
   do
     file_count=$((file_count+1))
   done
+  log "Counted ${file_count} files."
   IFS=$'\n'
 }
 
 
 function find_input_files {
+  log "Try to find input files for \"${param_dir}\"..."
   regex_file_matching="false"
   #
   # input file list sorted by ascending file size
   #
   #input_file_list=`ls -vhS $param_dir/*.in | tr ' ' '\n'|tac|tr '\n' ' '`
+  log "Find ${param_dir}/*.in"
   input_file_list=$(ls -v $param_dir/*.in 2> /dev/null)
   input_file_list_err_code=$?
 
@@ -725,6 +863,7 @@ function find_input_files {
     #
     # Obtain file list by using globs
     #
+    log "Find ${param_dir}"
     input_file_list=$(ls -v $param_dir 2> /dev/null)
     input_file_list_err_code=$?
     regex_file_matching="true"
@@ -734,6 +873,7 @@ function find_input_files {
     #
     # Obtain file list by using regexes
     #
+    log "Find regex ${param_dir}"
     input_file_list=$(find -regextype posix-extended -regex "${param_dir}" -printf "%p  ")
     input_file_list_err_code=$?
     regex_file_matching="true"
@@ -741,6 +881,7 @@ function find_input_files {
 }
 
 function run_testing {
+  log "Run testing..."
   sbusy
   file_index=1
   err_index=0
@@ -758,6 +899,10 @@ function run_testing {
     do
       sbusy
       prog=${flag_testing_programs[${prog_iter}]}
+      
+      log "Tested input ${input_file_path} for program ${prog}"
+      
+      
       #echo "|===> Prog ${prog}"
       if [ $flag_testing_programs_len -gt 1 ]; then
         flag_additional_test_name_info="${B_INFO} ${prog} ${E_INFO}"
@@ -903,6 +1048,7 @@ function run_testing {
 }
 
 function print_summary {
+  log "Print testing summary."
   sready
   stdout "\n"
   if [[ $flag_minimal = 'false' ]]; then
@@ -932,6 +1078,7 @@ function print_summary {
 
 
 function print_start {
+  log "Print initial message"
   if [[ $flag_minimal = 'false' ]]; then
     sready
   stdout "\n"
@@ -941,21 +1088,25 @@ function print_start {
     stdout "${B_BOLD}Performing tests...${E_BOLD}\n"
     prog_short_name=$(shortname "$param_prog")
     stdout "${B_DEBUG}Call $param_prog $input_prog_flag_acc (short name: ${prog_short_name}) ${E_DEBUG}\n\n"
+    log "Call $param_prog $input_prog_flag_acc (short name: ${prog_short_name})\n\n"
   fi
 }
 
 
 
 function test_err {
+  log "Test error output"
   if [[ "$flag_always_ignore_stderr" = "false" ]]; then
     if [[ $flag_test_err_script != '' ]]; then
       check_testing_script_err
     else
       if [[ "$flag_good_err_path" != "" ]]; then
         if [ "$good_err_path" ]; then
+          log "Diff \"${err_path}\" \"${good_err_path}\""
           diff=$(diff --text --minimal --suppress-blank-empty --strip-trailing-cr --ignore-case --ignore-tab-expansion --ignore-trailing-space --ignore-space-change --ignore-all-space --ignore-blank-lines $err_path $good_err_path)
       
           if [[ $diff != '' ]]; then
+            log "Diff is not empty :("
             was_error=true
             print_error_by_default=false
             err_index=$((err_index+1))
@@ -981,12 +1132,15 @@ function test_err {
           fi
 
         else
+          log "Good error path not found"
           if [[ ${flag_always_need_good_err} = 'true' ]]; then
             warn_index=$((warn_index+1))
             if [[ ${flag_auto_test_creation} = 'true' ]]; then
               not_exists_but_created_index=$((not_exists_but_created_index+1))
+              log "Create good err output file \"$good_err_path\""
               r=$($param_prog $input_prog_flag_acc < $input_file_path 2> $good_err_path 1> /dev/null)
             else
+              log "Just display warnning and proceed"
               not_exists_index=$((not_exists_index+1))
               if [[ "$not_exists_index" -lt "10" ]]; then
                 if [[ ${flag_extreamely_minimalistic} = 'true' ]]; then
@@ -1001,10 +1155,13 @@ function test_err {
             fi
           else
             if [[ "$flag_default_require_err_emptyness" = "true" ]]; then
+              log "Err output emptyness testing..."
               if [ -s "$err_path" ]; then
+                log "Err output is not empty :("
                 was_error=true
               fi
             else
+              log "Good err file does not exist and required emptyness is set to false. So do nothing."
               # ERR NOT EXISTS
               # DO NOTHING BY DEFAULT
               echo -en ""
@@ -1012,7 +1169,9 @@ function test_err {
           fi
         fi
       else
+        log "Good err output path is empty so just test for error emptyness..."
         if [ -s "$err_path" ]; then
+          log "Error output is not empty :("
           was_error=true
         fi
       fi
@@ -1039,6 +1198,7 @@ function evalspecplain {
 # Usage: load_prop_variable <variable_prefix> <variable_name> <output_variable> <false_to_disable_parsing>
 #
 function load_prop_variable {
+  log "Load traced variable ${1}${2} into ${3}"
   input_var_name="${1}${2}"
   output_var_name="${3}"
   output_var_name=$(safename "${output_var_name}")
@@ -1061,6 +1221,7 @@ function load_prop_variable {
 # Usage: load_prop_value <value> <output_variable> <false_to_disable_parsing>
 #
 function load_prop_value {
+    log "Load traced value ${1} into ${2}"
     temp_prop_variable_cap="${1}"
     load_prop_variable "" "temp_prop_variable_cap" "${2}" "{3}"
     temp_prop_variable_cap=""
@@ -1070,6 +1231,7 @@ function load_prop_value {
 # Usage: load_prop_variable_arr <variable_prefix> <variable_name> <output_variable>
 #
 function load_prop_variable_arr {
+  log "Load traced array ${1}${2} into ${3}"
   input_var_name="${1}${2}[@]"
   output_var_name="${3}"
   input_var_name=$(safename "${input_var_name}")
@@ -1092,9 +1254,11 @@ function load_prop_variable_arr {
 
 
 function load_global_configuration_file {
+  log "Load global configuration file \"${global_configuration_file_path}\""
   return_buffer=""
   global_configuration_file_path="./utest.yaml"
   if [ -f "$global_configuration_file_path" ]; then
+    log "Configuration file exists so proceed"
     #
     # Load global configuration file
     #
@@ -1145,12 +1309,14 @@ function load_global_configuration_file {
       load_prop_variable "" "prog_arr_parser_acc" "param_prog"
     fi
     
-    
+  else
+    log "Global configuration file not found :("
   fi
   return_buffer=""
 }
 
 function load_single_test_configuration_file {
+  log "Load single test configuration file \"${single_test_configuration_file_path}\""
   return_buffer=""
   
   short_name=$(shortname "$param_prog")
@@ -1181,6 +1347,7 @@ function load_single_test_configuration_file {
   #flag_test_out_script
   
   if [ -f "$single_test_configuration_file_path" ]; then
+    log "Configuration file exists so proceed"
     #
     # Load configuration file for single test execution
     #
@@ -1216,10 +1383,14 @@ function load_single_test_configuration_file {
     #printf "$configuration_parsed_setupsss\n"
     
     #printf "Return buffer:\n${return_buffer}"
+  else
+    log "Single test configuration file not found :("
   fi
 }
 
 function unload_single_test_configuration_file {
+  
+  log "Unload single test configuration..."
   
   # Backup pre-global settings
   backup_global_config_script=$(printf "$return_buffer")
@@ -1244,6 +1415,7 @@ function unload_single_test_configuration_file {
 # Usage: run_hook <hook_name>
 #
 function run_hook {
+  log "Run hook ${1}"
   sbusy
   hook_name="flag_hook_${1}[@]"
   hook_name=$(safename "${hook_name}")
@@ -1252,8 +1424,10 @@ function run_hook {
   hook_result=""
   silent_mode="false"
   if [[ "${hook_value[@]}" != "" ]]; then
+    log "Execute hook listeners... :)"
     for hook_command_raw in "${hook_value[@]}"
     do
+      log "Execute hook command:\n   ${hook_command_raw}"
       hook_command=$(evalspecplain "${hook_command_raw}")
       
       #echo -en "Hook:command |${hook_command}|\n"
@@ -1278,6 +1452,8 @@ function run_hook {
         hook_result="${hook_result}${hook_command_result}\n"
       fi
     done
+  else
+    log "No hook listeners found! :("
   fi
   if [[ "${hook_result}" != "" ]]; then
     sready
@@ -1288,6 +1464,7 @@ function run_hook {
     fi
     sbusy
   fi
+  log "Finished executing hook."
 }
 
 
@@ -1353,7 +1530,7 @@ function push_test_message_next_program {
 
 function flush_test_messages {
   sready
-  stdoutplain "${message_accumulator}"
+  stdoutplain "${message_accumulator}      "
   message_accumulator=""
   message_last_file_head=""
   message_tooling_data_accumulator=""
@@ -1391,6 +1568,7 @@ function flush_err_messages {
 function abort_if_too_many_errors {
   if [[ "$err_index" -gt 5 ]]; then
     if [[ $flag_always_continue = 'false' ]]; then
+      log "Too many errors. ABORT"
       sready
       stdout "\n${B_WARN}[!] Abort testing +5 errors.${E_WARN}\nDo not use --ta flag to always continue."
       clean_temp
@@ -1400,13 +1578,16 @@ function abort_if_too_many_errors {
 }
 
 function check_out_script {
+  log "Check output testing script results"
   ok=true
   if [[ $diff != '' ]]; then
     if [[ $diff != 'ok' ]]; then
+      log "Diff is not empty and not ok :("
       ok=false
     fi
   fi
   if [[ $ok != 'true' ]]; then
+    log "Test failure detected. :("
     err_index=$((err_index+1))
     err_message=$diff
     
@@ -1433,18 +1614,25 @@ function check_out_script {
     if [[ $flag_skip_ok = 'false' ]]; then
       push_test_message_good
     fi
-    rm -f $err_path
+    if [[ "$flag_never_rm" = "false" ]]; then
+      rm -f $err_path
+    else
+      log "Err output removal was blocked (flag never rm is set up)."
+    fi
   fi
 }
 
 function check_out_script_err {
+  log "Check error output testing script results"
   ok=true
   if [[ $diff != '' ]]; then
     if [[ $diff != 'ok' ]]; then
+      log "Diff is not empty and not ok :("
       ok=false
     fi
   fi
   if [[ $ok != 'true' ]]; then
+    log "Test failure detected. :("
     was_error=true
     print_error_by_default=false
     err_index=$((err_index+1))
@@ -1466,7 +1654,10 @@ function check_out_script_err {
 }
 
 function check_out_diff {
+  log "Check output diff results"
   if [[ $diff != '' ]]; then
+    log "Diff is not empty :("
+    log "Test failure detected. :("
     err_index=$((err_index+1))
     err_message=$diff
 
@@ -1493,22 +1684,29 @@ function check_out_diff {
     if [[ $flag_skip_ok = 'false' ]]; then
       push_test_message_good
     fi
-    rm -f $err_path
+    if [[ "$flag_never_rm" = "false" ]]; then
+      rm -f $err_path
+    else
+      log "Error output removal was blocked (flag never rm is set up)."
+    fi
 
   fi
 }
 
 function check_testing_script {
+  log "Run testing script for output..."
   test_not_exists=true
   override_test_command=
   override_test_result=
 
   if [[ $flag_test_out_script = "ignore" ]]; then
+    log "IGNORE testing script used."
     test_not_exists=false
     override_test_result="ok"
   fi
 
   if [[ -f "$flag_test_out_script" ]]; then
+    log "Testing script does not exist :("
     test_not_exists=false
   fi
   if [[ $test_not_exists = 'true' ]]; then
@@ -1533,16 +1731,19 @@ function check_testing_script {
 }
 
 function check_testing_script_err {
+  log "Run testing script for error output..."
   test_not_exists=true
   override_test_command=
   override_test_result=
 
   if [[ $flag_test_err_script = "ignore" ]]; then
+    log "IGNORE testing script used."
     test_not_exists=false
     override_test_result="ok"
   fi
 
   if [[ -f "$flag_test_err_script" ]]; then
+    log "Testing script does not exist :("
     test_not_exists=false
   fi
   if [[ $test_not_exists = 'true' ]]; then
@@ -1557,8 +1758,10 @@ function check_testing_script_err {
       diff=$override_test_result
     else
       if [[ $override_test_command != '' ]]; then
+        log "Execute testing script\n   $override_test_command $err_path $good_err_path"
         diff=$($override_test_command $err_path $good_err_path)
       else
+        log "Execute testing script\n   $flag_test_err_script $err_path $good_err_path"
         diff=$($flag_test_err_script $err_path $good_err_path)
       fi
     fi
@@ -1567,18 +1770,22 @@ function check_testing_script_err {
 }
 
 function test_out {
+  log "Test output..."
   if [[ $flag_test_out_script != '' ]]; then
     check_testing_script
   else
     if [ -e "$good_out_path" ]; then
+      log "Check diff of $out_path $good_out_path"
       diff=$(diff --text --minimal --suppress-blank-empty --strip-trailing-cr --ignore-case --ignore-tab-expansion --ignore-trailing-space --ignore-space-change --ignore-all-space --ignore-blank-lines $out_path $good_out_path)
       check_out_diff
     else
       warn_index=$((warn_index+1))
       if [[ ${flag_auto_test_creation} = 'true' ]]; then
         not_exists_but_created_index=$((not_exists_but_created_index+1))
+        log "Create test output file:\n  $param_prog $input_prog_flag_acc < $input_file_path 1> $good_out_path 2> /dev/null"
         r=$($param_prog $input_prog_flag_acc < $input_file_path 1> $good_out_path 2> /dev/null)
       else
+        log "Good output file does not exist :("
         not_exists_index=$((not_exists_index+1))
         if [[ "$not_exists_index" -lt "10" ]]; then
           if [[ ${flag_extreamely_minimalistic} = 'true' ]]; then
@@ -1607,6 +1814,7 @@ function print_tooling_additional_test_info {
 # Usage: run_program_pipe <input_file> <output_file> <pipes>
 #
 function run_program_pipe {
+  log "Run piping for \"${1}\" -> \"${2}\""
   input_orig="${1}"
   input="${2}"
   output="${2}.temp"
@@ -1618,6 +1826,8 @@ function run_program_pipe {
     for pipe in "$3"
     do
       
+      log "Run pipe\n   ${pipe}"
+      
       #
       # Pipe file from $input -> to $output
       #
@@ -1626,16 +1836,24 @@ function run_program_pipe {
       # Copy result back from output to input
       # then remove output file
       if [[ -f "$output" ]]; then
+        log "Copy file:\n  cp -f \"$output\" \"$input\""
         cp -f "$output" "$input"
       fi
-      rm -f "$output"
-      
+      log "Remove output file:\n  rm -f \"$output\""
+      if [[ "$flag_never_rm" = "false" ]]; then
+        rm -f "$output"
+      else
+        log "Output file removal was blocked (flag never rm is set up)."
+      fi
       
     done
   fi
+  log "Pipes exit."
 }
 
 function run_program {
+
+  log "Run program"
 
   tooling_additional_test_info=""
   r=""
@@ -1646,30 +1864,37 @@ function run_program {
     run_program_pipe "$input_file_path" "${input_file_path}.piped" "${flag_pipe_input[@]}"
   fi
   
+  
+  target_input="${input_file_path}"
+  target_out="${out_path}"
+  target_err="${err_path}"
+   
+  # There are no pipes used so do not operate on files
+  if [[ ! "$flag_no_pipes" = "true" ]]; then
+    target_input="${input_file_path}.piped"
+    target_out="${out_path}.piped"
+    target_err="${err_path}.piped"
+  fi
+  
+  target_command="$param_prog $input_prog_flag_acc < \"${target_input}\" 1> \"${target_out}\" 2> \"${target_err}\""
+  target_command_mocked="$param_prog $input_prog_flag_acc < \"${target_input}\" 1> /dev/null 2> /dev/null"
+  target_command_mocked_push_err="$param_prog $input_prog_flag_acc < \"${target_input}\" 1> /dev/null"
+  
+  
+  if [[ ! "$param_cwd" = "" ]]; then
+    eval_call="( cd $param_cwd ; ${param_prog} ${input_prog_flag_acc} )"
+    log "CWD switched!"
+    target_command="$eval_call < \"${target_input}\" 1> \"${target_out}\" 2> \"${target_err}\""
+  fi
+  
+  log "Run program... Pipe to:\n  < \"${target_input}\"\n  1> \"${target_out}\"\n  2> \"${target_err}\" "
+  log "Full command is:\n  ${target_command}"
+  
   if [[ $flag_tools_use_stime = 'true' ]]; then
     tool_time_data_stime_start=`date +%s%3N`
   fi
 
-  if [[ ! "$param_cwd" = "" ]]; then
-    eval_call="( cd $param_cwd ; ${param_prog} ${input_prog_flag_acc} )"
-    
-    # There are no pipes used so do not operate on files
-    if [[ "$flag_no_pipes" = "true" ]]; then
-      eval $eval_call < "${input_file_path}" 1> "${out_path}" 2> "${err_path}"
-    else
-      eval $eval_call < "${input_file_path}.piped" 1> "${out_path}.piped" 2> "${err_path}.piped"
-    fi
-  
-  else
-    
-    # There are no pipes used so do not operate on files
-    if [[ "$flag_no_pipes" = "true" ]]; then
-      r=$(eval $param_prog $input_prog_flag_acc < "${input_file_path}" 1> "${out_path}" 2> "${err_path}")
-    else
-      r=$(eval $param_prog $input_prog_flag_acc < "${input_file_path}.piped" 1> "${out_path}.piped" 2> "${err_path}.piped")
-    fi
-    
-  fi  
+  r=$(eval $target_command)
 
   if [[ $flag_tools_use_stime = 'true' ]]; then
     tool_time_data_stime_end=`date +%s%3N`
@@ -1679,7 +1904,7 @@ function run_program {
 
   if [[ $flag_tools_use_time = 'true' ]]; then
     #r=$($param_prog $input_prog_flag_acc < $input_file_path 1> $out_path 2> $err_path)
-    timeOut=$({ time $param_prog $input_prog_flag_acc < $input_file_path 1> /dev/null 2> /dev/null ; } 2>&1 )
+    timeOut=$({ time $target_command_mocked ; } 2>&1 )
     timeOut="$(echo -e "${timeOut}" | sed '/./,$!d')"
     #tooling_additional_test_info="${tooling_additional_test_info}${timeOut}\n"
     timeReal=$(echo "${timeOut}" | grep real | sed -e 's/real//')
@@ -1688,16 +1913,20 @@ function run_program {
   fi
 
   if [[ $flag_tools_use_vmassif = 'true' ]]; then
-    { valgrind --tool=massif --pages-as-heap=yes --massif-out-file=massif.out $param_prog $input_prog_flag_acc < $input_file_path 1> /dev/null 2> /dev/null ; } > /dev/null 2>&1
+    { valgrind --tool=massif --pages-as-heap=yes --massif-out-file=massif.out $target_command_mocked ; } > /dev/null 2>&1
     memUsage=$(grep mem_heap_B massif.out | sed -e 's/mem_heap_B=\(.*\)/\1/' | sort -g | tail -n 1)
     memUsage=$(echo "scale=5; $memUsage/1000000" | bc)
     #tooling_additional_test_info="${tooling_additional_test_info}Peak memory usage: ${memUsage}MB\n"
     push_test_message_tooling_info "${memUsage}MB"
-    rm ./massif.out
+    if [[ "$flag_never_rm" = "false" ]]; then
+      rm ./massif.out
+    else
+      log "Massif output file removal was blocked (flag never rm is set up)."
+    fi
   fi
 
   if [[ $flag_tools_use_vmemcheck = 'true' ]]; then
-    { valgrind --tool=memcheck $param_prog $input_prog_flag_acc < $input_file_path > /dev/null ; } 2> ./memcheck.out
+    { valgrind --tool=memcheck $target_command_mocked_push_err ; } 2> ./memcheck.out
     leaksReport=$(sed 's/==.*== //' ./memcheck.out | sed -n -e '/LEAK SUMMARY:/,$p' | sed 's/LEAK SUMMARY://' | head -5)
     if [[ $leaksReport != '' ]]; then
       #tooling_additional_test_info="${tooling_additional_test_info}Leaks detected / Report:\n${leaksReport}\n"
@@ -1706,11 +1935,15 @@ function run_program {
       #tooling_additional_test_info="${tooling_additional_test_info}No leaks possible.\n"
       push_test_message_tooling_info "No leaks"
     fi
-    rm ./memcheck.out
+    if [[ "$flag_never_rm" = "false" ]]; then
+      rm ./memcheck.out
+    else
+      log "Memcheck output file removal was blocked (flag never rm is set up)."
+    fi
   fi
   
   if [[ $flag_tools_use_size = 'true' ]]; then
-    inputFileSize=$(stat -c%s "${input_file_path}")
+    inputFileSize=$(stat -c%s "${target_input}")
     push_test_message_tooling_info "<${inputFileSize} bytes"
   fi
   
@@ -1724,13 +1957,20 @@ function run_program {
     
     
     # Remove unwanted piping files
-    rm -f "${input_file_path}.piped"
-    rm -f "${out_path}.piped"
+    log "Remove unwanted piping files\n  rm -f \"${input_file_path}.piped\"\n  rm -f \"${out_path}.piped\""
+    if [[ "$flag_never_rm" = "false" ]]; then
+      rm -f "${input_file_path}.piped"
+      rm -f "${out_path}.piped"
+    else
+      log "Piping files removal was blocked (flag never rm is set up)."
+    fi
   fi
 
+  log "Finished running program."
 }
 
 function run_utest {
+  log "Started utest main body :)"
   sbusy
   set_format
   load_global_configuration_file
@@ -1750,6 +1990,7 @@ function run_utest {
   run_hook "deinit"
   sready
   clean_temp
+  log "Quitted utest main body"
 }
 
 #
@@ -1778,6 +2019,8 @@ do
         unset IFS
         IFS=$'\n'
       } ;;
+      --tdebug) flag_log=true; flag_never_rm=true ;;
+      --tlog) flag_log=true ;;
       --tscript) shift; flag_test_out_script="$1" ;;
       --tscript-err) shift; flag_test_err_script="$1" ;;
       --tierr) flag_always_ignore_stderr=true ;;
@@ -1846,9 +2089,10 @@ do
 done
 run_utest
 sready
+
+log "Exit utest..."
 if [[ "$err_index" != "0" ]]; then
    close 1
 fi
-
 close 0
 

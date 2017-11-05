@@ -1,0 +1,11 @@
+Autodected './files' as best test directory. Using it.
+
+Performing tests...
+Call ./someprogram.sh  (short name: someprogram_sh)
+
+
+[1/3] test1.in                [OK]
+[2/3] test2.in                [OK]
+[3/3] test3.in                [OK]
+
+Done testing. All 3 tests passes.
