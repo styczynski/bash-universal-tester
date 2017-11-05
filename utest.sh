@@ -562,7 +562,7 @@ function prepare_input {
 function autofind_tests {
   # USE AUTOFIND
   log "Try to use autofind functionality..."
-  best_test_dir=$(find "$1" -maxdepth 3 -type f -name "**.in" -printf '%h\n' | sort | uniq -c | sort -k 1 -r | awk  '{print $2}' | head -n 1)
+  best_test_dir=$(find "$1" -maxdepth 3 -type f -name "**.in" -printf '%h\n' | sort | uniq -c | sort -k 1 -r | awk  '{print $2}' | head -n 1 | tr -d "[:cntrl:]")
   log "Autofind selected:\n  ${best_test_dir}"
   sready
   printf "$best_test_dir"
