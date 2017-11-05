@@ -4,4 +4,4 @@ install:
 script:
     - chmod u+x ./utest.sh 
     - chmod u+x ./self_test/autodetection_cli/someprogram.sh
-    - cd self_test && bash ../utest.sh --ttools stime
+    - cd self_test && bash ../utest.sh --ttools stime --tno-spinner
