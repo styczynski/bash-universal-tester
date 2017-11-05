@@ -326,11 +326,23 @@ function clean_temp_content {
   if [[ "$flag_never_rm" = "false" ]]; then
     if [[ ${flag_out_temp} = 'true' ]]; then
       log "Clean temp out:\n  rm -f -r $flag_out_path/*"
-      rm -f -r $flag_out_path/*
+      if [[ ! "$flag_out_path" = "" ]]; then
+        rm -f -r $flag_out_path/*.piped
+        rm -f -r $flag_out_path/*.out
+        rm -f -r $flag_out_path/*.err
+      else
+        log "ERROR Try to remove empty flag out path recursively! :(("
+      fi
     fi
     if [[ ${flag_err_temp} = 'true' ]]; then
       log "Clean temp err:\n  rm -f -r $flag_err_path/*"
-      rm -f -r $flag_err_path/*
+      if [[ ! "$flag_err_path" = "" ]]; then
+        rm -f -r $flag_err_path/*.piped
+        rm -f -r $flag_err_path/*.out
+        rm -f -r $flag_err_path/*.err
+      else
+        log "ERROR Try to remove empty flag err path recursively! :(("
+      fi
     fi
   else
     log "Cleanup blocked (never rm flag is set)"
@@ -345,11 +357,15 @@ function clean_temp {
   if [[ "$flag_never_rm" = "false" ]]; then
     if [[ ${flag_out_temp} = 'true' ]]; then
       log "Clean temp out:\n  rm -f -r $flag_out_path"
-      rm -f -r $flag_out_path
+      if [[ ! "$flag_out_path" = "" ]]; then
+        rm -f -r $flag_out_path
+      fi
     fi
     if [[ ${flag_err_temp} = 'true' ]]; then
       log "Clean temp err:\n  rm -f -r $flag_err_path"
-      rm -f -r $flag_err_path
+      if [[ ! "$flag_err_path" = "" ]]; then
+        rm -f -r $flag_err_path
+      fi
     fi
   else
     log "Cleanup blocked (never rm flag is set)"
@@ -1868,7 +1884,7 @@ function run_program {
   fi
   
   log "Run program... Pipe to:\n  < \"${target_input}\"\n  1> \"${target_out}\"\n  2> \"${target_err}\" "
-  log "Full command is:\n  target_command"
+  log "Full command is:\n  ${target_command}"
   
   if [[ $flag_tools_use_stime = 'true' ]]; then
     tool_time_data_stime_start=`date +%s%3N`
