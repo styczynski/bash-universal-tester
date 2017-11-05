@@ -2,4 +2,6 @@ language: generic
 install:
     - npm install
 script:
-    - chmod u+x ./utest.sh && cd self_test && bash ../utest.sh --ttools stime
+    - chmod u+x ./utest.sh 
+    - chmod u+x ./autodetection_cli/someprogram.sh
+    - cd self_test && bash ../utest.sh --ttools stime
