@@ -5,6 +5,8 @@ IFS=$'\n'
 
 log_container="    [[ UTEST version ${VERSION} ]]    \n\n"
 flag_log=false
+flag_never_rm=false
+
 function log {
   if [[ "$flag_log" = "true" ]]; then
     time=$(date "+%H:%M:%S")
@@ -12,6 +14,7 @@ function log {
     log_container="${log_container}\n${message}"
   fi
 }
+
 function flushlog {
   if [[ "$flag_log" = "true" ]]; then
     log "Flush log to the file."
@@ -320,13 +323,17 @@ function stdoutplain {
 
 function clean_temp_content {
   log "Clean temp content..."
-  if [[ ${flag_out_temp} = 'true' ]]; then
-    log "Clean temp out:\n  rm -f -r $flag_out_path/*"
-    rm -f -r $flag_out_path/*
-  fi
-  if [[ ${flag_err_temp} = 'true' ]]; then
-    log "Clean temp err:\n  rm -f -r $flag_err_path/*"
-    rm -f -r $flag_err_path/*
+  if [[ "$flag_never_rm" = "false" ]]; then
+    if [[ ${flag_out_temp} = 'true' ]]; then
+      log "Clean temp out:\n  rm -f -r $flag_out_path/*"
+      rm -f -r $flag_out_path/*
+    fi
+    if [[ ${flag_err_temp} = 'true' ]]; then
+      log "Clean temp err:\n  rm -f -r $flag_err_path/*"
+      rm -f -r $flag_err_path/*
+    fi
+  else
+    log "Cleanup blocked (never rm flag is set)"
   fi
   log "Cleanup done."
 }
@@ -335,13 +342,17 @@ function clean_temp_content {
 
 function clean_temp {
   log "Clean temp files..."
-  if [[ ${flag_out_temp} = 'true' ]]; then
-    log "Clean temp out:\n  rm -f -r $flag_out_path"
-    rm -f -r $flag_out_path
-  fi
-  if [[ ${flag_err_temp} = 'true' ]]; then
-    log "Clean temp err:\n  rm -f -r $flag_err_path"
-    rm -f -r $flag_err_path
+  if [[ "$flag_never_rm" = "false" ]]; then
+    if [[ ${flag_out_temp} = 'true' ]]; then
+      log "Clean temp out:\n  rm -f -r $flag_out_path"
+      rm -f -r $flag_out_path
+    fi
+    if [[ ${flag_err_temp} = 'true' ]]; then
+      log "Clean temp err:\n  rm -f -r $flag_err_path"
+      rm -f -r $flag_err_path
+    fi
+  else
+    log "Cleanup blocked (never rm flag is set)"
   fi
   log "Cleanup done."
 }
@@ -368,6 +379,9 @@ function print_help {
   printf "      [prog_flags] are optional conmmand line argument passed to program <prog>\n"
   printf "      [test_flags] are optional flags for test script\n"
   printf "      All available [test_flags] are:\n"
+  printf "        --tdebug - Turns debug mode ON.\n"
+  printf "            In debug mode no files are ever deleted!\n"
+  printf "            Also logging with --tlog is enabled.\n"
   printf "        --tlog - Enable logging to the utest.log file.\n"
   printf "        --tsilent - Outputs nothing except for the hooks messages.\n"
   printf "        --ttools <tools> - set additional debug tools\n"
@@ -730,8 +744,12 @@ function clean_out_err_paths {
   log "   rm -f -r $flag_err_path/*"
   mkdir -p $flag_out_path
   mkdir -p $flag_err_path
-  rm -f -r $flag_out_path/*
-  rm -f -r $flag_err_path/*
+  if [[ "$flag_never_rm" = "false" ]]; then
+    rm -f -r $flag_out_path/*
+    rm -f -r $flag_err_path/*
+  else
+    log "Removal blocked (flag never rm is set up)."
+  fi
 }
 
 
@@ -1576,7 +1594,11 @@ function check_out_script {
     if [[ $flag_skip_ok = 'false' ]]; then
       push_test_message_good
     fi
-    rm -f $err_path
+    if [[ "$flag_never_rm" = "false" ]]; then
+      rm -f $err_path
+    else
+      log "Err output removal was blocked (flag never rm is set up)."
+    fi
   fi
 }
 
@@ -1642,7 +1664,11 @@ function check_out_diff {
     if [[ $flag_skip_ok = 'false' ]]; then
       push_test_message_good
     fi
-    rm -f $err_path
+    if [[ "$flag_never_rm" = "false" ]]; then
+      rm -f $err_path
+    else
+      log "Error output removal was blocked (flag never rm is set up)."
+    fi
 
   fi
 }
@@ -1794,8 +1820,11 @@ function run_program_pipe {
         cp -f "$output" "$input"
       fi
       log "Remove output file:\n  rm -f \"$output\""
-      rm -f "$output"
-      
+      if [[ "$flag_never_rm" = "false" ]]; then
+        rm -f "$output"
+      else
+        log "Output file removal was blocked (flag never rm is set up)."
+      fi
       
     done
   fi
@@ -1869,7 +1898,11 @@ function run_program {
     memUsage=$(echo "scale=5; $memUsage/1000000" | bc)
     #tooling_additional_test_info="${tooling_additional_test_info}Peak memory usage: ${memUsage}MB\n"
     push_test_message_tooling_info "${memUsage}MB"
-    rm ./massif.out
+    if [[ "$flag_never_rm" = "false" ]]; then
+      rm ./massif.out
+    else
+      log "Massif output file removal was blocked (flag never rm is set up)."
+    fi
   fi
 
   if [[ $flag_tools_use_vmemcheck = 'true' ]]; then
@@ -1882,7 +1915,11 @@ function run_program {
       #tooling_additional_test_info="${tooling_additional_test_info}No leaks possible.\n"
       push_test_message_tooling_info "No leaks"
     fi
-    rm ./memcheck.out
+    if [[ "$flag_never_rm" = "false" ]]; then
+      rm ./memcheck.out
+    else
+      log "Memcheck output file removal was blocked (flag never rm is set up)."
+    fi
   fi
   
   if [[ $flag_tools_use_size = 'true' ]]; then
@@ -1901,8 +1938,12 @@ function run_program {
     
     # Remove unwanted piping files
     log "Remove unwanted piping files\n  rm -f \"${input_file_path}.piped\"\n  rm -f \"${out_path}.piped\""
-    rm -f "${input_file_path}.piped"
-    rm -f "${out_path}.piped"
+    if [[ "$flag_never_rm" = "false" ]]; then
+      rm -f "${input_file_path}.piped"
+      rm -f "${out_path}.piped"
+    else
+      log "Piping files removal was blocked (flag never rm is set up)."
+    fi
   fi
 
   log "Finished running program."
@@ -1958,6 +1999,7 @@ do
         unset IFS
         IFS=$'\n'
       } ;;
+      --tdebug) flag_log=true; flag_never_rm=true ;;
       --tlog) flag_log=true ;;
       --tscript) shift; flag_test_out_script="$1" ;;
       --tscript-err) shift; flag_test_err_script="$1" ;;
