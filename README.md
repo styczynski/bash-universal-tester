@@ -28,7 +28,7 @@ Currently this script supports:
 
 This is stand-alone script.
 
-* Works on Linux with bash shell
+* Works on Linux with bash shell (tested on 4.4.12 and 4.3.39)
 
 * Works on Windows **(BUT YOU NEED BASH EMULATION LIKE [CYGWIN][link cygwin])**
 
