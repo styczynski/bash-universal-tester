@@ -358,13 +358,17 @@ function clean_temp {
     if [[ ${flag_out_temp} = 'true' ]]; then
       log "Clean temp out:\n  rm -f -r $flag_out_path"
       if [[ ! "$flag_out_path" = "" ]]; then
-        rm -f -r $flag_out_path
+        if [[ ! "$flag_out_path" = "/" ]]; then
+          rm -f -r $flag_out_path
+        fi
       fi
     fi
     if [[ ${flag_err_temp} = 'true' ]]; then
       log "Clean temp err:\n  rm -f -r $flag_err_path"
       if [[ ! "$flag_err_path" = "" ]]; then
-        rm -f -r $flag_err_path
+        if [[ ! "$flag_out_path" = "/" ]]; then
+          rm -f -r $flag_err_path
+        fi
       fi
     fi
   else
