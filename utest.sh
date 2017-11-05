@@ -129,7 +129,7 @@ function _spinner() {
                 kill -9 $3 > /dev/null 2>&1
                 while kill -0 $3 2>/dev/null; do sleep 0.005; done
                 sleep 0.005
-                printf "\b\b\b   \b\b\b"
+                printf "\b\b\b   \b\b\b  "
               fi
               ;;
         *)
