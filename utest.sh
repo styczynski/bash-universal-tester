@@ -256,6 +256,8 @@ flag_hook_test_case_fail_err=()
 flag_hook_test_case_fail_out=()
 flag_hook_test_case_fail=()
 flag_hook_test_case_success=()
+flag_hook_init_command=()
+flag_hook_deinit_command=()
 
 # Should be changed
 flag_no_pipes="false"
@@ -1000,8 +1002,12 @@ function run_testing {
         return_buffer=""
         load_single_test_configuration_file
         
+        run_hook "init_command"
+        
         run_hook "test_case_start"
         run_program
+        
+        run_hook "deinit_command"
 
         was_error=false
         want_to_skip_other_programs=false
@@ -1332,6 +1338,10 @@ function load_single_test_configuration_file {
   
   # Load global config
   load_prop_variable "${global_config_prefix}" "command" "param_prog"
+  
+  load_prop_variable_arr "${global_config_prefix}" "init_" "flag_hook_init_command"
+  load_prop_variable_arr "${global_config_prefix}" "deinit_" "flag_hook_deinit_command"
+  
   load_prop_variable "${global_config_prefix}" "cwd" "param_cwd"
   load_prop_variable "${global_config_prefix}" "args" "input_prog_flag_acc"
   load_prop_variable "${global_config_prefix}" "input" "input_file_path"
@@ -1441,6 +1451,15 @@ function run_hook {
       #echo -en "HOOK COMMAND IS ${hook_command}"
       
       hook_command_result=$(eval "${hook_command}")
+      status=$?
+      
+      if [[ ! "${status}" = "0" ]]; then
+        log "ERROR Hook command returned non-zero status! Report problems! :("
+        log "Finished executing hook."
+        stdout "${B_ERR}Hook returned non zero exit code:\n|  Hook: ${1}\n|  Program: ${param_prog}\n|  Test case: ${input_file_path}\n|  Command: ${hook_command}${E_ERR}\n"
+        close 1
+      fi
+      
       if [[ "${hook_command_result}" != "" ]]; then
         if [[ "$silent_mode" = "false" ]]; then
           if [[ "$hook_result" != "" ]]; then
@@ -1458,9 +1477,9 @@ function run_hook {
   if [[ "${hook_result}" != "" ]]; then
     sready
     if [[ "$silent_mode" = "false" ]]; then
-      printf "${B_INFO}[hook:${1}]${E_INFO}\n${hook_result}\n"
+      stdout "${B_INFO}[hook:${1}]${E_INFO}\n${hook_result}\n"
     else
-      printf "${hook_result}"
+      stdout "${hook_result}"
     fi
     sbusy
   fi
