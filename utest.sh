@@ -18,7 +18,7 @@ function log {
 function flushlog {
   if [[ "$flag_log" = "true" ]]; then
     log "Flush log to the file."
-    printf "$log_container" > utest.log
+    echo -e "$log_container" > utest.log
   fi
 }
 
@@ -234,10 +234,10 @@ flag_default_require_err_emptyness=false
 flag_always_ignore_stderr=false
 flag_test_out_script=
 flag_test_err_script=
-flag_out_path=./test_out_temp
-flag_err_path=./test_out_temp
-flag_err_temp=true
-flag_out_temp=true
+flag_out_path=./utest_cache
+flag_err_path=./utest_cache
+flag_err_temp=false
+flag_out_temp=false
 file_count=0
 flag_tools=
 flag_no_builtin_outputs="false"
@@ -313,7 +313,7 @@ TEXT_OK="OK"
 
 function stdout {
   if [[ "$flag_no_builtin_outputs" = "false" ]]; then
-    printf $@
+    echo -e $@
   fi
 }
 
@@ -766,9 +766,13 @@ function clean_out_err_paths {
   log "   rm -f -r $flag_err_path/*"
   mkdir -p $flag_out_path
   mkdir -p $flag_err_path
-  if [[ "$flag_never_rm" = "false" ]]; then
-    rm -f -r $flag_out_path/*
-    rm -f -r $flag_err_path/*
+  if [[ "${flag_never_rm}}" = "false" ]]; then
+    if [[ "${flag_out_temp}}" = "true" ]]; then
+        rm -f -r $flag_out_path/*
+    fi
+    if [[ "${flag_err_temp}" = "true" ]]; then
+        rm -f -r $flag_err_path/*
+    fi
   else
     log "Removal blocked (flag never rm is set up)."
   fi
@@ -1189,15 +1193,87 @@ function safename {
   echo "$1" | tr -cd '[[:alnum:]].@_-'
 }
 
+function filein {
+    echo "${1}" >> "${flag_out_path}/_cache_buffer_in.temp"
+    echo "${1}"
+}
+
+function fileout {
+    echo "${1}" >> "${flag_out_path}/_cache_buffer_out.temp"
+    echo "${1}"
+}
+
+function clear_cache_buffer {
+    mkdir -p $flag_out_path
+    echo "" > "${flag_out_path}/_cache_buffer_in.temp"
+    echo "" > "${flag_out_path}/_cache_buffer_out.temp"
+}
+
 function evalspec {
   code="${1/\%/\$}"
+  clear_cache_buffer
+  
+  cached_ins=$(cat "${flag_out_path}/_cache_buffer_in.temp")
+  cached_outs=$(cat "${flag_out_path}/_cache_buffer_out.temp")
+  
+  for cached_in in "$cached_ins"
+  do
+    log "[CACHED] IN {${cached_in}}"
+  done
+  
   eval $code
 }
 
 function evalspecplain {
+  incode="${1}"
   code="${1//\%/\$}"
+  clear_cache_buffer
   code=$(eval echo "$code")
-  echo "$code"
+  latest_out_timestamp=0
+  skip=true
+  skiplog=""
+  
+  if [[ "$incode" == *"%(fileout"* || "$incode" == *"%(filein"* ]]; then
+      # Out files
+      while read file; do
+        if [[ ! "$file" = "" ]]; then
+            if [[ ! -f "$file" ]]; then
+               skiplog="${skiplog}OUT $file do not exist./n"
+               skip=false
+            else
+                out_timestamp=$(stat -c %Y "$file")
+                skiplog="${skiplog}OUT TIME $file IS $out_timestamp./n"
+                if [[ ( "$out_timestamp" > "$latest_out_timestamp" ) ]]; then
+                    latest_out_timestamp="$out_timestamp"
+                fi
+            fi
+        fi
+      done <"${flag_out_path}/_cache_buffer_out.temp"
+      
+      
+      # In files
+      while read file; do
+        if [[ ! "$file" = "" ]]; then
+            if [[ -f "$file" ]]; then
+                in_timestamp=$(stat -c %Y "$file")
+                skiplog="${skiplog}IN TIME $file IS $in_timestamp AND LATEST OUT IS $latest_out_timestamp./n"
+                if [[ ( "$in_timestamp" > "$latest_out_timestamp" ) ]]; then
+                    skip=false
+                fi
+            else
+                skiplog="${skiplog}IN $file do not exist./n"
+            fi
+        fi
+      done <"${flag_out_path}/_cache_buffer_in.temp"
+      
+      if [[ "$skip" = "false" ]]; then
+        echo "$code"
+      else
+        echo "echo \"\""
+      fi
+  else
+    echo "$code"
+  fi
 }
 
 #
@@ -1437,8 +1513,9 @@ function run_hook {
     log "Execute hook listeners... :)"
     for hook_command_raw in "${hook_value[@]}"
     do
-      log "Execute hook command:\n   ${hook_command_raw}"
+      
       hook_command=$(evalspecplain "${hook_command_raw}")
+      log "Execute hook command:\n   ${hook_command_raw}\n   Translated: ${hook_command}"
       
       #echo -en "Hook:command |${hook_command}|\n"
       
