@@ -649,7 +649,7 @@ function verify_args {
         param_prog=$(echo "$possible_executables" | head -n 1)
         log "Automatically using program \"${param_prog}\"..."
         sready
-        stdout "${B_DEBUG}Autodected \'$param_prog\' as best test program. Using it.${E_DEBUG}\n"
+        stdout "${B_DEBUG}Autodected '$param_prog' as best test program. Using it.${E_DEBUG}\n"
       fi
     fi
     if [[ $param_dir = '' ]]; then
