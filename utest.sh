@@ -247,6 +247,7 @@ flag_pipe_input=()
 flag_pipe_output=()
 flag_pipe_err_output=()
 param_cwd=""
+flag_use_test_caching=true
 
 flag_hook_init=()
 flag_hook_deinit=()
@@ -325,7 +326,7 @@ function stdoutplain {
 
 function clean_temp_content {
   log "Clean temp content..."
-  if [[ "$flag_never_rm" = "false" ]]; then
+  if [[ "${flag_never_rm}${flag_use_test_caching}" = "falsefalse" ]]; then
     if [[ ${flag_out_temp} = 'true' ]]; then
       log "Clean temp out:\n  rm -f -r $flag_out_path/*"
       if [[ ! "$flag_out_path" = "" ]]; then
@@ -356,7 +357,7 @@ function clean_temp_content {
 
 function clean_temp {
   log "Clean temp files..."
-  if [[ "$flag_never_rm" = "false" ]]; then
+  if [[ "${flag_never_rm}${flag_use_test_caching}" = "falsefalse" ]]; then
     if [[ ${flag_out_temp} = 'true' ]]; then
       log "Clean temp out:\n  rm -f -r $flag_out_path"
       if [[ ! "$flag_out_path" = "" ]]; then
@@ -766,8 +767,8 @@ function clean_out_err_paths {
   log "   rm -f -r $flag_err_path/*"
   mkdir -p $flag_out_path
   mkdir -p $flag_err_path
-  if [[ "${flag_never_rm}}" = "false" ]]; then
-    if [[ "${flag_out_temp}}" = "true" ]]; then
+  if [[ "${flag_never_rm}${flag_use_test_caching}" = "falsefalse" ]]; then
+    if [[ "${flag_out_temp}" = "true" ]]; then
         rm -f -r $flag_out_path/*
     fi
     if [[ "${flag_err_temp}" = "true" ]]; then
@@ -938,6 +939,10 @@ function run_testing {
         input_file=$(basename $input_file_path)
         input_file_name=${input_file/.in/}
         input_file_folder=$(dirname "$input_file_path")
+        
+        out_path=$flag_out_path/${input_file/.in/.out}
+        err_path=$flag_err_path/${input_file/.in/.err}
+      
         
         # If input file name does not contain .in extension
         if [[ "${input_file/.in/}" = "$input_file" ]]; then
@@ -1212,14 +1217,6 @@ function clear_cache_buffer {
 function evalspec {
   code="${1/\%/\$}"
   clear_cache_buffer
-  
-  cached_ins=$(cat "${flag_out_path}/_cache_buffer_in.temp")
-  cached_outs=$(cat "${flag_out_path}/_cache_buffer_out.temp")
-  
-  for cached_in in "$cached_ins"
-  do
-    log "[CACHED] IN {${cached_in}}"
-  done
   
   eval $code
 }
@@ -1710,7 +1707,7 @@ function check_out_script {
     if [[ $flag_skip_ok = 'false' ]]; then
       push_test_message_good
     fi
-    if [[ "$flag_never_rm" = "false" ]]; then
+    if [[ "${flag_never_rm}${flag_use_test_caching}" = "falsefalse" ]]; then
       rm -f $err_path
     else
       log "Err output removal was blocked (flag never rm is set up)."
@@ -1780,7 +1777,7 @@ function check_out_diff {
     if [[ $flag_skip_ok = 'false' ]]; then
       push_test_message_good
     fi
-    if [[ "$flag_never_rm" = "false" ]]; then
+    if [[ "${flag_never_rm}${flag_use_test_caching}" = "falsefalse" ]]; then
       rm -f $err_path
     else
       log "Error output removal was blocked (flag never rm is set up)."
@@ -1936,7 +1933,7 @@ function run_program_pipe {
         cp -f "$output" "$input"
       fi
       log "Remove output file:\n  rm -f \"$output\""
-      if [[ "$flag_never_rm" = "false" ]]; then
+      if [[ "${flag_never_rm}${flag_use_test_caching}" = "falsefalse" ]]; then
         rm -f "$output"
       else
         log "Output file removal was blocked (flag never rm is set up)."
@@ -1950,7 +1947,8 @@ function run_program_pipe {
 function run_program {
 
   log "Run program"
-
+  agressive_cache_program_skip=false
+  
   tooling_additional_test_info=""
   r=""
   
@@ -1964,7 +1962,32 @@ function run_program {
   target_input="${input_file_path}"
   target_out="${out_path}"
   target_err="${err_path}"
-   
+  
+  log "[CACHE] Test ${target_input} ${target_out} ${target_err}"
+  
+  if [[ "$flag_use_test_caching" = "true" ]]; then
+    prevent_agressive_cache=false
+    if [[ ! -f "${target_input}" ]]; then
+      prevent_agressive_cache=true
+    fi
+    if [[ ! -f "${target_out}" ]]; then
+      prevent_agressive_cache=true
+    fi
+    if [[ ! -f "${target_err}" ]]; then
+      prevent_agressive_cache=true
+    fi
+    
+    if [[ "$prevent_agressive_cache" = "false" ]]; then
+      in_timestamp=$(stat -c %Y "${target_input}")
+      out_timestamp=$(stat -c %Y "${target_out}")
+      err_timestamp=$(stat -c %Y "${target_err}")
+      if [[ ( "$in_timestamp" < "$out_timestamp" ) && ( "$in_timestamp" < "$err_timestamp" ) ]]; then
+        agressive_cache_program_skip=true
+      fi
+    fi
+  fi
+  
+  
   # There are no pipes used so do not operate on files
   if [[ ! "$flag_no_pipes" = "true" ]]; then
     target_input="${input_file_path}.piped"
@@ -1990,7 +2013,12 @@ function run_program {
     tool_time_data_stime_start=`date +%s%3N`
   fi
 
-  r=$(eval $target_command)
+  if [[ "$agressive_cache_program_skip" = "false" ]]; then
+    r=$(eval $target_command)
+  else
+    push_test_message_tooling_info "CACHE"
+    log "Skipped program execution use cached test results."
+  fi
 
   if [[ $flag_tools_use_stime = 'true' ]]; then
     tool_time_data_stime_end=`date +%s%3N`
@@ -2054,9 +2082,11 @@ function run_program {
     
     # Remove unwanted piping files
     log "Remove unwanted piping files\n  rm -f \"${input_file_path}.piped\"\n  rm -f \"${out_path}.piped\""
-    if [[ "$flag_never_rm" = "false" ]]; then
+    if [[ "${flag_never_rm}" = "false" ]]; then
       rm -f "${input_file_path}.piped"
-      rm -f "${out_path}.piped"
+      if [[ "${flag_use_test_caching}" = "false" ]]; then
+        rm -f "${out_path}.piped"
+      fi
     else
       log "Piping files removal was blocked (flag never rm is set up)."
     fi
