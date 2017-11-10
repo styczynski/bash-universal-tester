@@ -1,0 +1,5 @@
+version: 100.0.5
+executions:
+    - prog0
+prog0:
+    command: cat %input_file_path

@@ -26,6 +26,43 @@ function flushlog {
 # Dependencies
 
 #
+# Dennis Williamson
+# 
+#
+
+vercomp () {
+    if [[ $1 == $2 ]]
+    then
+        return 0
+    fi
+    local IFS=.
+    local i ver1=($1) ver2=($2)
+    # fill empty fields in ver1 with zeros
+    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+    do
+        ver1[i]=0
+    done
+    for ((i=0; i<${#ver1[@]}; i++))
+    do
+        if [[ -z ${ver2[i]} ]]
+        then
+            # fill empty fields in ver2 with zeros
+            ver2[i]=0
+        fi
+        if ((10#${ver1[i]} > 10#${ver2[i]}))
+        then
+            return 1
+        fi
+        if ((10#${ver1[i]} < 10#${ver2[i]}))
+        then
+            return 2
+        fi
+    done
+    return 0
+}
+
+
+#
 #
 # YAML parsing in bash
 # Based on https://gist.github.com/pkuczynski/8665367
@@ -247,7 +284,7 @@ flag_pipe_input=()
 flag_pipe_output=()
 flag_pipe_err_output=()
 param_cwd=""
-flag_use_test_caching=true
+flag_use_test_caching=false
 
 flag_hook_init=()
 flag_hook_deinit=()
@@ -1337,6 +1374,23 @@ function load_prop_variable_arr {
   fi
 }
 
+function compare_version {
+  if [[ ! "$required_utest_version" = "" ]]; then
+    vercomp "$VERSION" "$required_utest_version"
+    status=$?
+    if [[ "$status" = "2" ]]; then
+      log "[VERSION] [ERROR] Detected that current version is not suitable for continuing\n   $VERSION < $required_utest_version"
+      if [[ "$flag_force" = "true" ]]; then
+        log "[WARNING] Version mismatch but continue (--tf flag present so proceed!)\n  That can be harmful! :("
+      else
+        stdout "\n${B_ERR}  Required version of utest is ${required_utest_version} and the current is older.${E_ERR}\n\n${B_ERR}   Please provide at least the mentioned version to continue.\n    Or use --tf flag to proceed forcefully.${E_ERR}"
+        close 101
+      fi
+    else
+      log "[VERSION] Version check OK :)"
+    fi
+  fi
+}
 
 function load_global_configuration_file {
   log "Load global configuration file \"${global_configuration_file_path}\""
@@ -1355,6 +1409,9 @@ function load_global_configuration_file {
     #printf "IFS on global load: ${IFS}\n"
     #printf "Global setup file contents:\n$configuration_parsed_setup\n"
     eval "$configuration_parsed_setup"
+    
+    load_prop_variable "global_config_" "version" "required_utest_version" "false"
+    compare_version
     
     load_prop_variable "global_config_" "input" "param_dir" "false"
     load_prop_variable "global_config_" "good_output" "flag_good_out_path" "false"
@@ -1375,7 +1432,6 @@ function load_global_configuration_file {
     load_prop_variable_arr "global_config_" "hooks__test_case_fail_out_" "flag_hook_test_case_fail_out"
     load_prop_variable_arr "global_config_" "hooks__test_case_fail_" "flag_hook_test_case_fail"
     load_prop_variable_arr "global_config_" "hooks__test_case_success_" "flag_hook_test_case_success"
-    
     
     
     #printf "HERE flag_good_out_path => ${flag_good_out_path}\n"
@@ -1450,6 +1506,9 @@ function load_single_test_configuration_file {
     eval "$configuration_parsed_setup"
     
     load_prop_variable "${config_prefix}" "args" "input_prog_flag_acc"
+    
+    load_prop_variable "${config_prefix}" "version" "required_utest_version"
+    compare_version
     
     #printf "input_prog_flag_acc ==> ${input_prog_flag_acc}\n"
     
