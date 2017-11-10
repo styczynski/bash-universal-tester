@@ -1,4 +1,6 @@
 version: 100.0.5
+input: test/*.in
+good_output: test/%input_file_name.out
 executions:
     - prog0
 prog0:
