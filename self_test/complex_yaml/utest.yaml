@@ -1,0 +1,23 @@
+input: test/*.in
+silent: false
+good_output: test/%input_file_name.out
+good_err: test/%input_file_name.err
+need_error_files: false
+testing_script_out: ignore
+testing_script_err: ignore
+executions:
+    - prog1
+    - prog2
+prog1:
+    cwd: ./somefolder
+    command: ./test/totest.sh
+    args: %input_file_name
+    pipes_out:
+        - echo 123 > %output
+    pipes_in:
+        - echo 123 > %output
+    pipes_out_err:
+        - echo 123 > %output
+        - cat %input | echo 123 > %output
+prog2:
+    command: echo 99

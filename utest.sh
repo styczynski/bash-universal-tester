@@ -1002,6 +1002,12 @@ function run_testing {
           single_test_configuration_file_path=${input_file_path}.config.yaml
         fi
         
+        if [[ ! "${out_path}" = "" ]]; then
+          rm -f "${out_path}"
+        fi
+        if [[ ! "${err_path}" = "" ]]; then
+          rm -f "${err_path}"
+        fi
         
         param_prog="$prog"
         param_prog_eval=$(evalspecplain "$param_prog")
