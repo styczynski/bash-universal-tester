@@ -568,9 +568,9 @@ function prepare_input {
     # USE AUTOFIND
     best_test_dir=$(autofind_tests "$folder_loc")
     if [[ ${best_test_dir} != '' ]]; then
-      log "Autodected ${best_test_dir} as best testing directory.\n  Using it. :)"
+      log "Autodetected ${best_test_dir} as best testing directory.\n  Using it. :)"
       sready
-      stdout "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
+      stdout "${B_DEBUG}Autodetected '$best_test_dir' as best test directory. Using it.${E_DEBUG}\n"
       update_loc "$best_test_dir"  
     else
       update_loc "$folder_loc"
@@ -649,7 +649,7 @@ function verify_args {
         param_prog=$(echo "$possible_executables" | head -n 1)
         log "Automatically using program \"${param_prog}\"..."
         sready
-        stdout "${B_DEBUG}Autodected '$param_prog' as best test program. Using it.${E_DEBUG}\n"
+        stdout "${B_DEBUG}Autodetected '$param_prog' as best test program. Using it.${E_DEBUG}\n"
       fi
     fi
     if [[ $param_dir = '' ]]; then
@@ -669,7 +669,7 @@ function verify_args {
         log "AUTODETECTION returned some result so proceed."
         sready
         #printf "${B_WARN}Input directory was not given. (parameter <input_dir> is missing)${E_WARN}\n"
-        stdout "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
+        stdout "${B_DEBUG}Autodetected '$best_test_dir' as best test directory. Using it.${E_DEBUG}\n"
         param_dir="$best_test_dir"
         if [[ "$flag_good_out_path" = "" ]]; then
           flag_good_out_path="$param_dir"
