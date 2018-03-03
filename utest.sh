@@ -2079,6 +2079,11 @@ function run_program {
   fi
 
   if [[ "$agressive_cache_program_skip" = "false" ]]; then
+    #
+    # TODO:
+    #   Perform exit code checks there
+    #   Probably add checker variant as for .out/.err files
+    #
     r=$(eval $target_command)
   else
     push_test_message_tooling_info "CACHE"
