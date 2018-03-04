@@ -18,12 +18,49 @@ function log {
 function flushlog {
   if [[ "$flag_log" = "true" ]]; then
     log "Flush log to the file."
-    printf "$log_container" > utest.log
+    echo -e "$log_container" > utest.log
   fi
 }
 
 
 # Dependencies
+
+#
+# Dennis Williamson
+# 
+#
+
+vercomp () {
+    if [[ $1 == $2 ]]
+    then
+        return 0
+    fi
+    local IFS=.
+    local i ver1=($1) ver2=($2)
+    # fill empty fields in ver1 with zeros
+    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+    do
+        ver1[i]=0
+    done
+    for ((i=0; i<${#ver1[@]}; i++))
+    do
+        if [[ -z ${ver2[i]} ]]
+        then
+            # fill empty fields in ver2 with zeros
+            ver2[i]=0
+        fi
+        if ((10#${ver1[i]} > 10#${ver2[i]}))
+        then
+            return 1
+        fi
+        if ((10#${ver1[i]} < 10#${ver2[i]}))
+        then
+            return 2
+        fi
+    done
+    return 0
+}
+
 
 #
 #
@@ -234,10 +271,10 @@ flag_default_require_err_emptyness=false
 flag_always_ignore_stderr=false
 flag_test_out_script=
 flag_test_err_script=
-flag_out_path=./test_out_temp
-flag_err_path=./test_out_temp
-flag_err_temp=true
-flag_out_temp=true
+flag_out_path=./utest_cache
+flag_err_path=./utest_cache
+flag_err_temp=false
+flag_out_temp=false
 file_count=0
 flag_tools=
 flag_no_builtin_outputs="false"
@@ -247,6 +284,7 @@ flag_pipe_input=()
 flag_pipe_output=()
 flag_pipe_err_output=()
 param_cwd=""
+flag_use_test_caching=false
 
 flag_hook_init=()
 flag_hook_deinit=()
@@ -256,6 +294,8 @@ flag_hook_test_case_fail_err=()
 flag_hook_test_case_fail_out=()
 flag_hook_test_case_fail=()
 flag_hook_test_case_success=()
+flag_hook_init_command=()
+flag_hook_deinit_command=()
 
 # Should be changed
 flag_no_pipes="false"
@@ -311,7 +351,7 @@ TEXT_OK="OK"
 
 function stdout {
   if [[ "$flag_no_builtin_outputs" = "false" ]]; then
-    printf $@
+    echo -e $@
   fi
 }
 
@@ -323,7 +363,7 @@ function stdoutplain {
 
 function clean_temp_content {
   log "Clean temp content..."
-  if [[ "$flag_never_rm" = "false" ]]; then
+  if [[ "${flag_never_rm}${flag_use_test_caching}" = "falsefalse" ]]; then
     if [[ ${flag_out_temp} = 'true' ]]; then
       log "Clean temp out:\n  rm -f -r $flag_out_path/*"
       if [[ ! "$flag_out_path" = "" ]]; then
@@ -354,7 +394,7 @@ function clean_temp_content {
 
 function clean_temp {
   log "Clean temp files..."
-  if [[ "$flag_never_rm" = "false" ]]; then
+  if [[ "${flag_never_rm}${flag_use_test_caching}" = "falsefalse" ]]; then
     if [[ ${flag_out_temp} = 'true' ]]; then
       log "Clean temp out:\n  rm -f -r $flag_out_path"
       if [[ ! "$flag_out_path" = "" ]]; then
@@ -566,9 +606,9 @@ function prepare_input {
     # USE AUTOFIND
     best_test_dir=$(autofind_tests "$folder_loc")
     if [[ ${best_test_dir} != '' ]]; then
-      log "Autodected ${best_test_dir} as best testing directory.\n  Using it. :)"
+      log "Autodetected ${best_test_dir} as best testing directory.\n  Using it. :)"
       sready
-      stdout "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
+      stdout "${B_DEBUG}Autodetected '$best_test_dir' as best test directory. Using it.${E_DEBUG}\n"
       update_loc "$best_test_dir"  
     else
       update_loc "$folder_loc"
@@ -647,7 +687,7 @@ function verify_args {
         param_prog=$(echo "$possible_executables" | head -n 1)
         log "Automatically using program \"${param_prog}\"..."
         sready
-        stdout "${B_DEBUG}Autodected \'$param_prog\' as best test program. Using it.${E_DEBUG}\n"
+        stdout "${B_DEBUG}Autodetected '$param_prog' as best test program. Using it.${E_DEBUG}\n"
       fi
     fi
     if [[ $param_dir = '' ]]; then
@@ -667,7 +707,7 @@ function verify_args {
         log "AUTODETECTION returned some result so proceed."
         sready
         #printf "${B_WARN}Input directory was not given. (parameter <input_dir> is missing)${E_WARN}\n"
-        stdout "${B_DEBUG}Autodected \'$best_test_dir\' as best test directory. Using it.${E_DEBUG}\n"
+        stdout "${B_DEBUG}Autodetected '$best_test_dir' as best test directory. Using it.${E_DEBUG}\n"
         param_dir="$best_test_dir"
         if [[ "$flag_good_out_path" = "" ]]; then
           flag_good_out_path="$param_dir"
@@ -764,9 +804,13 @@ function clean_out_err_paths {
   log "   rm -f -r $flag_err_path/*"
   mkdir -p $flag_out_path
   mkdir -p $flag_err_path
-  if [[ "$flag_never_rm" = "false" ]]; then
-    rm -f -r $flag_out_path/*
-    rm -f -r $flag_err_path/*
+  if [[ "${flag_never_rm}${flag_use_test_caching}" = "falsefalse" ]]; then
+    if [[ "${flag_out_temp}" = "true" ]]; then
+        rm -f -r $flag_out_path/*
+    fi
+    if [[ "${flag_err_temp}" = "true" ]]; then
+        rm -f -r $flag_err_path/*
+    fi
   else
     log "Removal blocked (flag never rm is set up)."
   fi
@@ -933,6 +977,10 @@ function run_testing {
         input_file_name=${input_file/.in/}
         input_file_folder=$(dirname "$input_file_path")
         
+        out_path=$flag_out_path/${input_file/.in/.out}
+        err_path=$flag_err_path/${input_file/.in/.err}
+      
+        
         # If input file name does not contain .in extension
         if [[ "${input_file/.in/}" = "$input_file" ]]; then
           input_file_name=${input_file}
@@ -991,6 +1039,12 @@ function run_testing {
           single_test_configuration_file_path=${input_file_path}.config.yaml
         fi
         
+        if [[ ! "${out_path}" = "" ]]; then
+          rm -f "${out_path}"
+        fi
+        if [[ ! "${err_path}" = "" ]]; then
+          rm -f "${err_path}"
+        fi
         
         param_prog="$prog"
         param_prog_eval=$(evalspecplain "$param_prog")
@@ -1000,8 +1054,12 @@ function run_testing {
         return_buffer=""
         load_single_test_configuration_file
         
+        run_hook "init_command"
+        
         run_hook "test_case_start"
         run_program
+        
+        run_hook "deinit_command"
 
         was_error=false
         want_to_skip_other_programs=false
@@ -1183,15 +1241,79 @@ function safename {
   echo "$1" | tr -cd '[[:alnum:]].@_-'
 }
 
+function filein {
+    echo "${1}" >> "${flag_out_path}/_cache_buffer_in.temp"
+    echo "${1}"
+}
+
+function fileout {
+    echo "${1}" >> "${flag_out_path}/_cache_buffer_out.temp"
+    echo "${1}"
+}
+
+function clear_cache_buffer {
+    mkdir -p $flag_out_path
+    echo "" > "${flag_out_path}/_cache_buffer_in.temp"
+    echo "" > "${flag_out_path}/_cache_buffer_out.temp"
+}
+
 function evalspec {
   code="${1/\%/\$}"
+  clear_cache_buffer
+  
   eval $code
 }
 
 function evalspecplain {
+  incode="${1}"
   code="${1//\%/\$}"
+  clear_cache_buffer
   code=$(eval echo "$code")
-  echo "$code"
+  latest_out_timestamp=0
+  skip=true
+  skiplog=""
+  
+  if [[ "$incode" == *"%(fileout"* || "$incode" == *"%(filein"* ]]; then
+      # Out files
+      while read file; do
+        if [[ ! "$file" = "" ]]; then
+            if [[ ! -f "$file" ]]; then
+               skiplog="${skiplog}OUT $file do not exist./n"
+               skip=false
+            else
+                out_timestamp=$(stat -c %Y "$file")
+                skiplog="${skiplog}OUT TIME $file IS $out_timestamp./n"
+                if [[ ( "$out_timestamp" > "$latest_out_timestamp" ) ]]; then
+                    latest_out_timestamp="$out_timestamp"
+                fi
+            fi
+        fi
+      done <"${flag_out_path}/_cache_buffer_out.temp"
+      
+      
+      # In files
+      while read file; do
+        if [[ ! "$file" = "" ]]; then
+            if [[ -f "$file" ]]; then
+                in_timestamp=$(stat -c %Y "$file")
+                skiplog="${skiplog}IN TIME $file IS $in_timestamp AND LATEST OUT IS $latest_out_timestamp./n"
+                if [[ ( "$in_timestamp" > "$latest_out_timestamp" ) ]]; then
+                    skip=false
+                fi
+            else
+                skiplog="${skiplog}IN $file do not exist./n"
+            fi
+        fi
+      done <"${flag_out_path}/_cache_buffer_in.temp"
+      
+      if [[ "$skip" = "false" ]]; then
+        echo "$code"
+      else
+        echo "echo \"\""
+      fi
+  else
+    echo "$code"
+  fi
 }
 
 #
@@ -1252,6 +1374,23 @@ function load_prop_variable_arr {
   fi
 }
 
+function compare_version {
+  if [[ ! "$required_utest_version" = "" ]]; then
+    vercomp "$VERSION" "$required_utest_version"
+    status=$?
+    if [[ "$status" = "2" ]]; then
+      log "[VERSION] [ERROR] Detected that current version is not suitable for continuing\n   $VERSION < $required_utest_version"
+      if [[ "$flag_force" = "true" ]]; then
+        log "[WARNING] Version mismatch but continue (--tf flag present so proceed!)\n  That can be harmful! :("
+      else
+        stdout "\n${B_ERR}  Required version of utest is ${required_utest_version} and the current is older.${E_ERR}\n\n${B_ERR}   Please provide at least the mentioned version to continue.\n    Or use --tf flag to proceed forcefully.${E_ERR}"
+        close 101
+      fi
+    else
+      log "[VERSION] Version check OK :)"
+    fi
+  fi
+}
 
 function load_global_configuration_file {
   log "Load global configuration file \"${global_configuration_file_path}\""
@@ -1270,6 +1409,9 @@ function load_global_configuration_file {
     #printf "IFS on global load: ${IFS}\n"
     #printf "Global setup file contents:\n$configuration_parsed_setup\n"
     eval "$configuration_parsed_setup"
+    
+    load_prop_variable "global_config_" "version" "required_utest_version" "false"
+    compare_version
     
     load_prop_variable "global_config_" "input" "param_dir" "false"
     load_prop_variable "global_config_" "good_output" "flag_good_out_path" "false"
@@ -1290,7 +1432,6 @@ function load_global_configuration_file {
     load_prop_variable_arr "global_config_" "hooks__test_case_fail_out_" "flag_hook_test_case_fail_out"
     load_prop_variable_arr "global_config_" "hooks__test_case_fail_" "flag_hook_test_case_fail"
     load_prop_variable_arr "global_config_" "hooks__test_case_success_" "flag_hook_test_case_success"
-    
     
     
     #printf "HERE flag_good_out_path => ${flag_good_out_path}\n"
@@ -1332,6 +1473,10 @@ function load_single_test_configuration_file {
   
   # Load global config
   load_prop_variable "${global_config_prefix}" "command" "param_prog"
+  
+  load_prop_variable_arr "${global_config_prefix}" "init_" "flag_hook_init_command"
+  load_prop_variable_arr "${global_config_prefix}" "deinit_" "flag_hook_deinit_command"
+  
   load_prop_variable "${global_config_prefix}" "cwd" "param_cwd"
   load_prop_variable "${global_config_prefix}" "args" "input_prog_flag_acc"
   load_prop_variable "${global_config_prefix}" "input" "input_file_path"
@@ -1361,6 +1506,9 @@ function load_single_test_configuration_file {
     eval "$configuration_parsed_setup"
     
     load_prop_variable "${config_prefix}" "args" "input_prog_flag_acc"
+    
+    load_prop_variable "${config_prefix}" "version" "required_utest_version"
+    compare_version
     
     #printf "input_prog_flag_acc ==> ${input_prog_flag_acc}\n"
     
@@ -1427,8 +1575,9 @@ function run_hook {
     log "Execute hook listeners... :)"
     for hook_command_raw in "${hook_value[@]}"
     do
-      log "Execute hook command:\n   ${hook_command_raw}"
+      
       hook_command=$(evalspecplain "${hook_command_raw}")
+      log "Execute hook command:\n   ${hook_command_raw}\n   Translated: ${hook_command}"
       
       #echo -en "Hook:command |${hook_command}|\n"
       
@@ -1441,6 +1590,15 @@ function run_hook {
       #echo -en "HOOK COMMAND IS ${hook_command}"
       
       hook_command_result=$(eval "${hook_command}")
+      status=$?
+      
+      if [[ ! "${status}" = "0" ]]; then
+        log "ERROR Hook command returned non-zero status! Report problems! :("
+        log "Finished executing hook."
+        stdout "${B_ERR}Hook returned non zero exit code:\n|  Hook: ${1}\n|  Program: ${param_prog}\n|  Test case: ${input_file_path}\n|  Command: ${hook_command}${E_ERR}\n"
+        close 1
+      fi
+      
       if [[ "${hook_command_result}" != "" ]]; then
         if [[ "$silent_mode" = "false" ]]; then
           if [[ "$hook_result" != "" ]]; then
@@ -1458,9 +1616,9 @@ function run_hook {
   if [[ "${hook_result}" != "" ]]; then
     sready
     if [[ "$silent_mode" = "false" ]]; then
-      printf "${B_INFO}[hook:${1}]${E_INFO}\n${hook_result}\n"
+      stdout "${B_INFO}[hook:${1}]${E_INFO}\n${hook_result}\n"
     else
-      printf "${hook_result}"
+      stdout "${hook_result}"
     fi
     sbusy
   fi
@@ -1614,7 +1772,7 @@ function check_out_script {
     if [[ $flag_skip_ok = 'false' ]]; then
       push_test_message_good
     fi
-    if [[ "$flag_never_rm" = "false" ]]; then
+    if [[ "${flag_never_rm}${flag_use_test_caching}" = "falsefalse" ]]; then
       rm -f $err_path
     else
       log "Err output removal was blocked (flag never rm is set up)."
@@ -1684,7 +1842,7 @@ function check_out_diff {
     if [[ $flag_skip_ok = 'false' ]]; then
       push_test_message_good
     fi
-    if [[ "$flag_never_rm" = "false" ]]; then
+    if [[ "${flag_never_rm}${flag_use_test_caching}" = "falsefalse" ]]; then
       rm -f $err_path
     else
       log "Error output removal was blocked (flag never rm is set up)."
@@ -1840,7 +1998,7 @@ function run_program_pipe {
         cp -f "$output" "$input"
       fi
       log "Remove output file:\n  rm -f \"$output\""
-      if [[ "$flag_never_rm" = "false" ]]; then
+      if [[ "${flag_never_rm}${flag_use_test_caching}" = "falsefalse" ]]; then
         rm -f "$output"
       else
         log "Output file removal was blocked (flag never rm is set up)."
@@ -1854,7 +2012,8 @@ function run_program_pipe {
 function run_program {
 
   log "Run program"
-
+  agressive_cache_program_skip=false
+  
   tooling_additional_test_info=""
   r=""
   
@@ -1868,7 +2027,32 @@ function run_program {
   target_input="${input_file_path}"
   target_out="${out_path}"
   target_err="${err_path}"
-   
+  
+  log "[CACHE] Test ${target_input} ${target_out} ${target_err}"
+  
+  if [[ "$flag_use_test_caching" = "true" ]]; then
+    prevent_agressive_cache=false
+    if [[ ! -f "${target_input}" ]]; then
+      prevent_agressive_cache=true
+    fi
+    if [[ ! -f "${target_out}" ]]; then
+      prevent_agressive_cache=true
+    fi
+    if [[ ! -f "${target_err}" ]]; then
+      prevent_agressive_cache=true
+    fi
+    
+    if [[ "$prevent_agressive_cache" = "false" ]]; then
+      in_timestamp=$(stat -c %Y "${target_input}")
+      out_timestamp=$(stat -c %Y "${target_out}")
+      err_timestamp=$(stat -c %Y "${target_err}")
+      if [[ ( "$in_timestamp" < "$out_timestamp" ) && ( "$in_timestamp" < "$err_timestamp" ) ]]; then
+        agressive_cache_program_skip=true
+      fi
+    fi
+  fi
+  
+  
   # There are no pipes used so do not operate on files
   if [[ ! "$flag_no_pipes" = "true" ]]; then
     target_input="${input_file_path}.piped"
@@ -1894,7 +2078,12 @@ function run_program {
     tool_time_data_stime_start=`date +%s%3N`
   fi
 
-  r=$(eval $target_command)
+  if [[ "$agressive_cache_program_skip" = "false" ]]; then
+    r=$(eval $target_command)
+  else
+    push_test_message_tooling_info "CACHE"
+    log "Skipped program execution use cached test results."
+  fi
 
   if [[ $flag_tools_use_stime = 'true' ]]; then
     tool_time_data_stime_end=`date +%s%3N`
@@ -1958,9 +2147,11 @@ function run_program {
     
     # Remove unwanted piping files
     log "Remove unwanted piping files\n  rm -f \"${input_file_path}.piped\"\n  rm -f \"${out_path}.piped\""
-    if [[ "$flag_never_rm" = "false" ]]; then
+    if [[ "${flag_never_rm}" = "false" ]]; then
       rm -f "${input_file_path}.piped"
-      rm -f "${out_path}.piped"
+      if [[ "${flag_use_test_caching}" = "false" ]]; then
+        rm -f "${out_path}.piped"
+      fi
     else
       log "Piping files removal was blocked (flag never rm is set up)."
     fi

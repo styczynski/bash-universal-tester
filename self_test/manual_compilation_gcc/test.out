@@ -1,0 +1,9 @@
+
+Performing tests...
+Call prog0  (short name: prog0)
+
+
+[1/2] test1.in                [OK]
+[2/2] test2.in                [OK]
+
+Done testing. All 2 tests passes.

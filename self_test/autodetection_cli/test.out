@@ -1,4 +1,4 @@
-Autodected './files' as best test directory. Using it.
+Autodetected './files' as best test directory. Using it.
 
 Performing tests...
 Call ./someprogram.sh  (short name: someprogram_sh)
